@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:odd/data/best_times_store.dart';
 import 'package:odd/domain/level_map.dart';
 import 'package:odd/game/hud_state.dart';
 import 'package:odd/game/input/game_input.dart';
@@ -23,10 +26,12 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> {
+  final BestTimesStore _bests = BestTimesStore();
   late int _index;
   late GameInput _input;
   late HudState _hud;
   late OddGame _game;
+  bool _recordedWin = false;
 
   @override
   void initState() {
@@ -37,8 +42,9 @@ class _GameScreenState extends State<GameScreen> {
 
   void _startLevel() {
     final level = widget.levels[_index];
+    _recordedWin = false;
     _input = GameInput();
-    _hud = HudState();
+    _hud = HudState()..addListener(_onHudChanged);
     _game = OddGame(
       level: level,
       input: _input,
@@ -46,8 +52,23 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  void _rebuildAt(int index) {
-    _hud.dispose();
+  void _onHudChanged() {
+    unawaited(_ensureRecorded());
+  }
+
+  Future<void> _ensureRecorded() async {
+    if (!_hud.won || _recordedWin) {
+      return;
+    }
+    _recordedWin = true;
+    await _bests.record(widget.levels[_index].id, _hud.elapsed);
+  }
+
+  Future<void> _rebuildAt(int index) async {
+    await _ensureRecorded();
+    _hud
+      ..removeListener(_onHudChanged)
+      ..dispose();
     setState(() {
       _index = index;
       _startLevel();
@@ -56,7 +77,9 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   void dispose() {
-    _hud.dispose();
+    _hud
+      ..removeListener(_onHudChanged)
+      ..dispose();
     super.dispose();
   }
 
@@ -75,8 +98,17 @@ class _GameScreenState extends State<GameScreen> {
           TouchControls(input: _input),
           HudOverlay(
             hud: _hud,
-            onBack: () => Navigator.of(context).pop(),
-            onRestart: _game.queueRestart,
+            onBack: () async {
+              await _ensureRecorded();
+              if (context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            onRestart: () async {
+              await _ensureRecorded();
+              _recordedWin = false;
+              _game.queueRestart();
+            },
           ),
           ListenableBuilder(
             listenable: _hud,
@@ -86,9 +118,23 @@ class _GameScreenState extends State<GameScreen> {
               }
               return WinOverlay(
                 time: _hud.elapsed,
-                onRetry: _game.queueRestart,
-                onNext: hasNext ? () => _rebuildAt(_index + 1) : null,
-                onMenu: () => Navigator.of(context).pop(),
+                onRetry: () async {
+                  await _ensureRecorded();
+                  _recordedWin = false;
+                  _game.queueRestart();
+                },
+                onNext: hasNext
+                    ? () async {
+                        await _ensureRecorded();
+                        _rebuildAt(_index + 1);
+                      }
+                    : null,
+                onMenu: () async {
+                  await _ensureRecorded();
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                },
               );
             },
           ),

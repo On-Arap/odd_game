@@ -2,8 +2,8 @@ abstract final class GameConfig {
   static const viewWidth = 640.0;
   static const viewHeight = 360.0;
 
-  static const playerWidth = 22.0;
-  static const playerHeight = 26.0;
+  static const playerWidth = 32.0;
+  static const playerHeight = 32.0;
 
   static const gravity = 1850.0;
   static const maxFallSpeed = 980.0;

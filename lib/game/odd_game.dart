@@ -13,6 +13,7 @@ import 'package:odd/game/palette.dart';
 import 'package:odd/game/player/player.dart';
 import 'package:odd/game/world/coin.dart';
 import 'package:odd/game/world/ground_block.dart';
+import 'package:odd/game/world/snow_autotile.dart';
 
 class OddGame extends FlameGame with HasKeyboardHandlerComponents {
   OddGame({
@@ -38,6 +39,12 @@ class OddGame extends FlameGame with HasKeyboardHandlerComponents {
 
   @override
   Future<void> onLoad() async {
+    images.prefix = 'assets/sprites/';
+    await images.loadAll([
+      'Enemies/penguin.png',
+      'Objects/coin_gold.png',
+      'Tilesets/tileset_snow.png',
+    ]);
     camera.viewfinder.anchor = Anchor.center;
     add(KeyboardBridge(input, onRestart: queueRestart));
     spawnLevel();
@@ -56,16 +63,45 @@ class OddGame extends FlameGame with HasKeyboardHandlerComponents {
     final grid = CollisionGrid(level);
 
     final tile = level.tileSize;
+    final snow = images.fromCache('Tilesets/tileset_snow.png');
     for (var row = 0; row < level.rows; row++) {
       for (var col = 0; col < level.cols; col++) {
-        if (!level.isSolid(col, row)) {
+        final cell = level.tileAt(col, row);
+        if (!TileCodes.isSolid(cell)) {
+          continue;
+        }
+        final at = Vector2(col * tile, row * tile);
+        final size = Vector2(tile, tile);
+        if (cell == TileCodes.ice || cell == TileCodes.mud) {
+          world.add(
+            GroundBlock.color(
+              position: at,
+              size: size,
+              color: Palette.tile(cell, col, row),
+            ),
+          );
+          continue;
+        }
+        final src = SnowAutotile.src(level, col, row);
+        if (src == null) {
+          world.add(
+            GroundBlock.color(
+              position: at,
+              size: size,
+              color: Palette.snowFill,
+            ),
+          );
           continue;
         }
         world.add(
-          GroundBlock(
-            position: Vector2(col * tile, row * tile),
-            size: Vector2(tile, tile),
-            color: Palette.tile(level.tileAt(col, row), col, row),
+          GroundBlock.sprite(
+            position: at,
+            size: size,
+            sprite: Sprite(
+              snow,
+              srcPosition: Vector2(src.x, src.y),
+              srcSize: Vector2.all(SnowAutotile.size),
+            ),
           ),
         );
       }
@@ -74,7 +110,6 @@ class OddGame extends FlameGame with HasKeyboardHandlerComponents {
     for (final pos in level.coins) {
       final coin = Coin(
         center: Vector2((pos.col + 0.5) * tile, (pos.row + 0.5) * tile),
-        tileSize: tile,
       );
       coins.add(coin);
       world.add(coin);

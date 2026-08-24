@@ -2,21 +2,18 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
-import 'package:odd/game/palette.dart';
 
-class Coin extends PositionComponent {
-  Coin({required Vector2 center, required double tileSize})
+class Coin extends SpriteAnimationComponent with HasGameReference {
+  Coin({required Vector2 center})
     : _origin = center.clone(),
       super(
         position: center,
-        size: Vector2.all(tileSize * 0.45),
+        size: Vector2.all(16),
         anchor: Anchor.center,
         priority: 10,
       );
 
   final Vector2 _origin;
-  final Paint _fill = Paint()..color = Palette.coin;
-  final Paint _inner = Paint()..color = Palette.coinInner;
   double _time = 0;
   bool collected = false;
 
@@ -25,6 +22,18 @@ class Coin extends PositionComponent {
       center: Offset(position.x, position.y),
       width: size.x * 0.85,
       height: size.y * 0.85,
+    );
+  }
+
+  @override
+  Future<void> onLoad() async {
+    animation = SpriteAnimation.fromFrameData(
+      game.images.fromCache('Objects/coin_gold.png'),
+      SpriteAnimationData.sequenced(
+        amount: 8,
+        stepTime: 0.08,
+        textureSize: Vector2.all(16),
+      ),
     );
   }
 
@@ -38,12 +47,5 @@ class Coin extends PositionComponent {
     super.update(dt);
     _time += dt;
     position.y = _origin.y + math.sin(_time * 4) * 3;
-  }
-
-  @override
-  void render(Canvas canvas) {
-    final outer = size.toRect();
-    canvas.drawOval(outer, _fill);
-    canvas.drawOval(outer.deflate(size.x * 0.22), _inner);
   }
 }

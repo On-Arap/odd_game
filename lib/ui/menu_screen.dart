@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:odd/data/best_times_store.dart';
 import 'package:odd/data/level_repository.dart';
+import 'package:odd/domain/best_times.dart';
 import 'package:odd/domain/level_map.dart';
+import 'package:odd/game/hud_state.dart';
 import 'package:odd/game/palette.dart';
 import 'package:odd/ui/game_screen.dart';
 
@@ -12,78 +15,129 @@ class MenuScreen extends StatefulWidget {
 }
 
 class _MenuScreenState extends State<MenuScreen> {
-  late final Future<List<LevelMap>> _levels = LevelRepository().loadAll();
+  List<LevelMap>? _levels;
+  Object? _error;
+  BestTimes _bests = const BestTimes({});
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final levels = await LevelRepository().loadAll();
+      final bests = await BestTimesStore().load();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _levels = levels;
+        _bests = bests;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _error = error);
+    }
+  }
+
+  Future<void> _openLevel(List<LevelMap> levels, int index) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => GameScreen(
+          levels: levels,
+          index: index,
+        ),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    final bests = await BestTimesStore().load();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _bests = bests);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: FutureBuilder<List<LevelMap>>(
-          future: _levels,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    'Could not load maps.\n${snapshot.error}',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              );
-            }
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final levels = snapshot.data!;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'ODD',
-                    style: TextStyle(
-                      fontSize: 42,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 6,
-                      color: Palette.menuAccent,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Grab every coin. Fastest time wins.',
-                    style: TextStyle(color: Palette.hudMuted, fontSize: 14),
-                  ),
-                  const SizedBox(height: 18),
-                  Expanded(
-                    child: ListView.separated(
-                      itemCount: levels.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        final level = levels[index];
-                        return _LevelTile(
-                          index: index,
-                          level: level,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => GameScreen(
-                                  levels: levels,
-                                  index: index,
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
+        child: _body(),
+      ),
+    );
+  }
+
+  Widget _body() {
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Could not load maps.\n$_error',
+            textAlign: TextAlign.center,
+          ),
         ),
+      );
+    }
+    final levels = _levels;
+    if (levels == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final total = _bests.totalFor(levels.map((level) => level.id));
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ODD',
+            style: TextStyle(
+              fontSize: 42,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 6,
+              color: Palette.menuAccent,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Grab every coin. Fastest time wins.',
+            style: TextStyle(color: Palette.hudMuted, fontSize: 14),
+          ),
+          if (total != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Total ${formatRunTime(total)}',
+              style: const TextStyle(
+                color: Palette.hud,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+          const SizedBox(height: 18),
+          Expanded(
+            child: ListView.separated(
+              itemCount: levels.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final level = levels[index];
+                return _LevelTile(
+                  index: index,
+                  level: level,
+                  best: _bests.forLevel(level.id),
+                  onTap: () => _openLevel(levels, index),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -93,11 +147,13 @@ class _LevelTile extends StatelessWidget {
   const _LevelTile({
     required this.index,
     required this.level,
+    required this.best,
     required this.onTap,
   });
 
   final int index;
   final LevelMap level;
+  final double? best;
   final VoidCallback onTap;
 
   @override
@@ -122,17 +178,33 @@ class _LevelTile extends StatelessWidget {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Text(
-                  level.name,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      level.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '${level.coinCount} coins',
+                      style: const TextStyle(
+                        color: Palette.hudMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Text(
-                '${level.coinCount} coins',
-                style: const TextStyle(color: Palette.hudMuted),
+                best == null ? '—' : formatRunTime(best!),
+                style: TextStyle(
+                  color: best == null ? Palette.hudMuted : Palette.hud,
+                  fontWeight: FontWeight.w700,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ],
           ),

@@ -7,10 +7,9 @@ import 'package:odd/game/collision/collision_grid.dart';
 import 'package:odd/game/config.dart';
 import 'package:odd/game/hud_state.dart';
 import 'package:odd/game/input/game_input.dart';
-import 'package:odd/game/palette.dart';
 import 'package:odd/game/world/coin.dart';
 
-class Player extends PositionComponent {
+class Player extends PositionComponent with HasGameReference {
   Player({
     required this.grid,
     required this.input,
@@ -32,8 +31,7 @@ class Player extends PositionComponent {
   final VoidCallback onDeath;
 
   final Vector2 velocity = Vector2.zero();
-  final Paint _body = Paint()..color = Palette.player;
-  final Paint _eye = Paint()..color = Palette.playerEye;
+  late final SpriteAnimationComponent _sprite;
 
   int _facing = 1;
   bool _grounded = false;
@@ -52,6 +50,30 @@ class Player extends PositionComponent {
       width: size.x,
       height: size.y,
     );
+  }
+
+  @override
+  Future<void> onLoad() async {
+    const art = 16.0;
+    const insetX = 8.0;
+    const insetY = 16.0;
+    const slot = 32.0;
+    final sheet = game.images.fromCache('Enemies/penguin.png');
+    final frames = [
+      for (var i = 0; i < 4; i++)
+        Sprite(
+          sheet,
+          srcPosition: Vector2(insetX + i * slot, insetY),
+          srcSize: Vector2.all(art),
+        ),
+    ];
+    _sprite = SpriteAnimationComponent(
+      animation: SpriteAnimation.spriteList(frames, stepTime: 0.12),
+      size: size.clone(),
+      anchor: Anchor.center,
+      position: size / 2,
+    );
+    add(_sprite);
   }
 
   Rect get _feetProbe {
@@ -98,6 +120,7 @@ class Player extends PositionComponent {
     _moveY(dt);
     _probeWalls();
     _collectCoins();
+    _syncSprite();
 
     if (position.y > grid.level.worldHeight + GameConfig.deathMargin) {
       onDeath();
@@ -283,6 +306,18 @@ class Player extends PositionComponent {
     );
   }
 
+  void _syncSprite() {
+    if (!isLoaded) {
+      return;
+    }
+    _sprite.scale.x = _facing.toDouble();
+    final running = _grounded && velocity.x.abs() > 12;
+    _sprite.playing = running;
+    if (!running) {
+      _sprite.animationTicker?.currentIndex = _grounded ? 0 : 1;
+    }
+  }
+
   void _collectCoins() {
     for (final coin in coins) {
       if (coin.collected) {
@@ -295,19 +330,4 @@ class Player extends PositionComponent {
     }
   }
 
-  @override
-  void render(Canvas canvas) {
-    final body = size.toRect();
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(body, const Radius.circular(3)),
-      _body,
-    );
-    final eye = _facing > 0
-        ? Rect.fromLTWH(size.x - 10, 6, 6, 6)
-        : Rect.fromLTWH(4, 6, 6, 6);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(eye, const Radius.circular(1.5)),
-      _eye,
-    );
-  }
 }
