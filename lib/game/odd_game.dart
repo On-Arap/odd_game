@@ -13,6 +13,7 @@ import 'package:odd/game/palette.dart';
 import 'package:odd/game/player/player.dart';
 import 'package:odd/game/world/coin.dart';
 import 'package:odd/game/world/ground_block.dart';
+import 'package:odd/game/world/ice_autotile.dart';
 import 'package:odd/game/world/snow_autotile.dart';
 
 class OddGame extends FlameGame with HasKeyboardHandlerComponents {
@@ -41,9 +42,9 @@ class OddGame extends FlameGame with HasKeyboardHandlerComponents {
   Future<void> onLoad() async {
     images.prefix = 'assets/sprites/';
     await images.loadAll([
-      'Enemies/penguin.png',
-      'Objects/coin_gold.png',
-      'Tilesets/tileset_snow.png',
+      'player/penguin.png',
+      'objects/coin_gold.png',
+      'tilesets/tileset_snow.png',
     ]);
     camera.viewfinder.anchor = Anchor.center;
     add(KeyboardBridge(input, onRestart: queueRestart));
@@ -63,7 +64,7 @@ class OddGame extends FlameGame with HasKeyboardHandlerComponents {
     final grid = CollisionGrid(level);
 
     final tile = level.tileSize;
-    final snow = images.fromCache('Tilesets/tileset_snow.png');
+    final snow = images.fromCache('tilesets/tileset_snow.png');
     for (var row = 0; row < level.rows; row++) {
       for (var col = 0; col < level.cols; col++) {
         final cell = level.tileAt(col, row);
@@ -72,7 +73,23 @@ class OddGame extends FlameGame with HasKeyboardHandlerComponents {
         }
         final at = Vector2(col * tile, row * tile);
         final size = Vector2(tile, tile);
-        if (cell == TileCodes.ice || cell == TileCodes.mud) {
+        if (cell == TileCodes.ice) {
+          final src = IceAutotile.src(level, col, row);
+          world.add(
+            GroundBlock.sprite(
+              position: at,
+              size: size,
+              background: Palette.snowFill,
+              sprite: Sprite(
+                snow,
+                srcPosition: Vector2(src.x, src.y),
+                srcSize: Vector2.all(IceAutotile.size),
+              ),
+            ),
+          );
+          continue;
+        }
+        if (cell == TileCodes.mud) {
           world.add(
             GroundBlock.color(
               position: at,

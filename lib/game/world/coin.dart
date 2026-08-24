@@ -28,7 +28,7 @@ class Coin extends SpriteAnimationComponent with HasGameReference {
   @override
   Future<void> onLoad() async {
     animation = SpriteAnimation.fromFrameData(
-      game.images.fromCache('Objects/coin_gold.png'),
+      game.images.fromCache('objects/coin_gold.png'),
       SpriteAnimationData.sequenced(
         amount: 8,
         stepTime: 0.08,

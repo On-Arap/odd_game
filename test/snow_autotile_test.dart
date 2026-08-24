@@ -69,4 +69,14 @@ void main() {
     ]);
     expect(SnowAutotile.src(level, 2, 1), const SnowTileSrc(32, 64));
   });
+
+  test('ice neighbors are ignored for snow autotile', () {
+    final level = _map(const [
+      '.....',
+      '.I#I.',
+      '..I..',
+      '.P.C.',
+    ]);
+    expect(SnowAutotile.src(level, 2, 1), const SnowTileSrc(112, 16));
+  });
 }

@@ -6,15 +6,20 @@ class WinOverlay extends StatelessWidget {
   const WinOverlay({
     super.key,
     required this.time,
+    required this.personalBest,
     required this.onRetry,
     required this.onMenu,
     this.onNext,
   });
 
   final double time;
+  final double? personalBest;
   final VoidCallback onRetry;
   final VoidCallback onMenu;
   final VoidCallback? onNext;
+
+  bool get _isPersonalBest =>
+      personalBest == null || time <= personalBest!;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +46,18 @@ class WinOverlay extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  if (_isPersonalBest) ...[
+                    const Text(
+                      'PERSONAL BEST :',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 2,
+                        color: Palette.menuAccent,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
                   Text(
                     formatRunTime(time),
                     style: const TextStyle(
@@ -49,6 +66,18 @@ class WinOverlay extends StatelessWidget {
                       fontFeatures: [FontFeature.tabularFigures()],
                     ),
                   ),
+                  if (!_isPersonalBest) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'PB ${formatRunTime(personalBest!)}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Palette.hudMuted,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 22),
                   Row(
                     children: [

@@ -32,6 +32,7 @@ class _GameScreenState extends State<GameScreen> {
   late HudState _hud;
   late OddGame _game;
   bool _recordedWin = false;
+  double? _levelBest;
 
   @override
   void initState() {
@@ -43,6 +44,7 @@ class _GameScreenState extends State<GameScreen> {
   void _startLevel() {
     final level = widget.levels[_index];
     _recordedWin = false;
+    _levelBest = null;
     _input = GameInput();
     _hud = HudState()..addListener(_onHudChanged);
     _game = OddGame(
@@ -50,6 +52,17 @@ class _GameScreenState extends State<GameScreen> {
       input: _input,
       hud: _hud,
     );
+    unawaited(_loadLevelBest());
+  }
+
+  Future<void> _loadLevelBest() async {
+    final bests = await _bests.load();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _levelBest = bests.forLevel(widget.levels[_index].id);
+    });
   }
 
   void _onHudChanged() {
@@ -61,7 +74,26 @@ class _GameScreenState extends State<GameScreen> {
       return;
     }
     _recordedWin = true;
-    await _bests.record(widget.levels[_index].id, _hud.elapsed);
+    final levelId = widget.levels[_index].id;
+    final time = _hud.elapsed;
+
+    // Keep in-memory PB in sync immediately so retry + win overlay stay correct.
+    final stored = _storedBestAfterRun(_levelBest, time);
+    if (stored != _levelBest && mounted) {
+      setState(() => _levelBest = stored);
+    } else {
+      _levelBest = stored;
+    }
+
+    await _bests.record(levelId, time);
+  }
+
+  /// Mirrors [BestTimes.record] for the current level's stored time.
+  double? _storedBestAfterRun(double? current, double runTime) {
+    if (current == null || runTime < current) {
+      return runTime;
+    }
+    return current;
   }
 
   Future<void> _rebuildAt(int index) async {
@@ -118,6 +150,7 @@ class _GameScreenState extends State<GameScreen> {
               }
               return WinOverlay(
                 time: _hud.elapsed,
+                personalBest: _levelBest,
                 onRetry: () async {
                   await _ensureRecorded();
                   _recordedWin = false;

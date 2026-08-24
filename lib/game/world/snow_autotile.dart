@@ -19,7 +19,7 @@ class SnowTileSrc {
 /// in `tileset_snow.png`.
 ///
 /// Off-map cells count as solid. Empty, coins, and the player do not.
-/// Icicles and the snowman in the PNG are decoration, not terrain cases.
+/// Ice is ignored. Mud counts. Icicles and the snowman are decoration.
 abstract final class SnowAutotile {
   static const size = 16.0;
 
@@ -79,7 +79,8 @@ abstract final class SnowAutotile {
     if (col < 0 || col >= level.cols || row < 0 || row >= level.rows) {
       return true;
     }
-    return TileCodes.isSolid(level.tileAt(col, row));
+    final cell = level.tileAt(col, row);
+    return cell == TileCodes.solid || cell == TileCodes.mud || cell == TileCodes.ice;
   }
 
   static Map<int, SnowTileSrc> _buildCatalog() {

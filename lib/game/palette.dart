@@ -4,7 +4,7 @@ import 'package:odd/domain/level_map.dart';
 
 abstract final class Palette {
   static const background = Color(0xFF1F1F1F);
-  static const snowFill = Color.fromARGB(255, 56, 52, 85);
+  static const snowFill = Color(0xFF383455);
   static const groundA = Color(0xFF4D4D4D);
   static const groundB = Color(0xFF626262);
   static const iceA = Color(0xFF7EC8E3);

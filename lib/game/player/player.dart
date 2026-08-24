@@ -58,7 +58,7 @@ class Player extends PositionComponent with HasGameReference {
     const insetX = 8.0;
     const insetY = 16.0;
     const slot = 32.0;
-    final sheet = game.images.fromCache('Enemies/penguin.png');
+    final sheet = game.images.fromCache('player/penguin.png');
     final frames = [
       for (var i = 0; i < 4; i++)
         Sprite(
