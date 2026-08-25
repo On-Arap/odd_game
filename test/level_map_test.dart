@@ -23,6 +23,7 @@ void main() {
     expect(level.rows, 3);
     expect(level.spawn, const GridPos(1, 1));
     expect(level.coins, [const GridPos(2, 1)]);
+    expect(level.authorTime, isNull);
     expect(level.isSolid(0, 1), isTrue);
     expect(level.isSolid(1, 1), isFalse);
     expect(level.isSolid(-1, 1), isTrue);
@@ -51,6 +52,25 @@ void main() {
     expect(level.tileAt(2, 2), TileCodes.mud);
     expect(surfaceOf('I'), GroundSurface.ice);
     expect(surfaceOf('M'), GroundSurface.mud);
+  });
+
+  test('parses optional author_time', () {
+    const source = '''
+{
+  "format": 1,
+  "id": "timed",
+  "name": "Timed",
+  "tileSize": 16,
+  "author_time": 12.34,
+  "grid": [
+    "###",
+    "#P#",
+    "#C#"
+  ]
+}
+''';
+    final level = LevelMap.parseJson(source, file: 'timed.json');
+    expect(level.authorTime, 12.34);
   });
 
   test('rejects unknown tiles and missing spawn', () {

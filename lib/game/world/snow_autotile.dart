@@ -20,6 +20,9 @@ class SnowTileSrc {
 ///
 /// Off-map cells count as solid. Empty, coins, and the player do not.
 /// Ice is ignored. Mud counts. Icicles and the snowman are decoration.
+///
+/// When no mockup tile matches exactly, pick by cardinal neighbors (N/E/S/W)
+/// first, then break ties with diagonals.
 abstract final class SnowAutotile {
   static const size = 16.0;
 
@@ -41,8 +44,10 @@ abstract final class SnowAutotile {
     '...........',
   ];
 
+  /// 1x1 plot in the mockup — Hamming fallback when no edge tile matches.
+  static const isolated = SnowTileSrc(112, 16);
+
   static final Map<int, SnowTileSrc> _catalog = _buildCatalog();
-  static final SnowTileSrc _fallback = _catalog[0xFF]!;
 
   /// Null means the block is boxed in on all 8 sides; use a flat fill color.
   static SnowTileSrc? src(LevelMap level, int col, int row) {
@@ -54,25 +59,41 @@ abstract final class SnowAutotile {
   }
 
   static SnowTileSrc pick(int mask) {
+    if (mask == 0xFF) {
+      return isolated;
+    }
     final exact = _catalog[mask];
     if (exact != null) {
       return exact;
     }
-    var best = _fallback;
-    var bestScore = 1 << 30;
+    var best = isolated;
+    var bestCardinal = 9;
+    var bestDiagonal = 9;
     for (final entry in _catalog.entries) {
-      var score = 0;
-      for (var i = 0; i < 8; i++) {
-        if (((mask >> i) & 1) != ((entry.key >> i) & 1)) {
-          score += i == _n || i == _e || i == _s || i == _w ? 2 : 1;
-        }
-      }
-      if (score < bestScore) {
-        bestScore = score;
+      final cardinal = _hamming(mask, entry.key, cardinals: true);
+      final diagonal = _hamming(mask, entry.key, cardinals: false);
+      if (cardinal < bestCardinal ||
+          (cardinal == bestCardinal && diagonal < bestDiagonal)) {
+        bestCardinal = cardinal;
+        bestDiagonal = diagonal;
         best = entry.value;
       }
     }
     return best;
+  }
+
+  static int _hamming(int a, int b, {required bool cardinals}) {
+    var score = 0;
+    for (var i = 0; i < 8; i++) {
+      final isCardinal = i == _n || i == _e || i == _s || i == _w;
+      if (isCardinal != cardinals) {
+        continue;
+      }
+      if (((a >> i) & 1) != ((b >> i) & 1)) {
+        score++;
+      }
+    }
+    return score;
   }
 
   static bool blocks(LevelMap level, int col, int row) {
@@ -80,7 +101,7 @@ abstract final class SnowAutotile {
       return true;
     }
     final cell = level.tileAt(col, row);
-    return cell == TileCodes.solid || cell == TileCodes.mud || cell == TileCodes.ice;
+    return cell == TileCodes.solid || cell == TileCodes.mud;
   }
 
   static Map<int, SnowTileSrc> _buildCatalog() {
@@ -91,10 +112,11 @@ abstract final class SnowAutotile {
         if (line[tx] != '#') {
           continue;
         }
-        catalog.putIfAbsent(
-          _maskAt(tx, ty, _mockupSolid),
-          () => SnowTileSrc(tx * size, ty * size),
-        );
+        final mask = _maskAt(tx, ty, _mockupSolid);
+        if (mask == 0xFF) {
+          continue;
+        }
+        catalog.putIfAbsent(mask, () => SnowTileSrc(tx * size, ty * size));
       }
     }
     return catalog;

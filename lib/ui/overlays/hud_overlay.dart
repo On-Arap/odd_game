@@ -8,11 +8,13 @@ class HudOverlay extends StatelessWidget {
     required this.hud,
     required this.onBack,
     required this.onRestart,
+    this.backLabel = 'MENU',
   });
 
   final HudState hud;
   final VoidCallback onBack;
   final VoidCallback onRestart;
+  final String backLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +31,7 @@ class HudOverlay extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _HudButton(label: 'MENU', onTap: onBack),
+                      _HudButton(label: backLabel, onTap: onBack),
                       const SizedBox(width: 8),
                       _HudButton(label: 'RETRY', onTap: onRestart),
                     ],

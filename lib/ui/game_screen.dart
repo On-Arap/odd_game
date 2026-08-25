@@ -16,10 +16,14 @@ class GameScreen extends StatefulWidget {
     super.key,
     required this.levels,
     required this.index,
+    this.playtest = false,
   });
 
   final List<LevelMap> levels;
   final int index;
+
+  /// Editor try-out: no personal bests, back returns to the caller.
+  final bool playtest;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -33,6 +37,7 @@ class _GameScreenState extends State<GameScreen> {
   late OddGame _game;
   bool _recordedWin = false;
   double? _levelBest;
+  double? _playtestBest;
 
   @override
   void initState() {
@@ -52,7 +57,9 @@ class _GameScreenState extends State<GameScreen> {
       input: _input,
       hud: _hud,
     );
-    unawaited(_loadLevelBest());
+    if (!widget.playtest) {
+      unawaited(_loadLevelBest());
+    }
   }
 
   Future<void> _loadLevelBest() async {
@@ -66,11 +73,17 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _onHudChanged() {
+    if (widget.playtest && _hud.won) {
+      final time = _hud.elapsed;
+      if (_playtestBest == null || time < _playtestBest!) {
+        _playtestBest = time;
+      }
+    }
     unawaited(_ensureRecorded());
   }
 
   Future<void> _ensureRecorded() async {
-    if (!_hud.won || _recordedWin) {
+    if (widget.playtest || !_hud.won || _recordedWin) {
       return;
     }
     _recordedWin = true;
@@ -115,6 +128,10 @@ class _GameScreenState extends State<GameScreen> {
     super.dispose();
   }
 
+  void _leave() {
+    Navigator.of(context).pop(widget.playtest ? _playtestBest : null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasNext = _index + 1 < widget.levels.length;
@@ -130,10 +147,11 @@ class _GameScreenState extends State<GameScreen> {
           TouchControls(input: _input),
           HudOverlay(
             hud: _hud,
+            backLabel: widget.playtest ? 'EDITOR' : 'MENU',
             onBack: () async {
               await _ensureRecorded();
               if (context.mounted) {
-                Navigator.of(context).pop();
+                _leave();
               }
             },
             onRestart: () async {
@@ -150,7 +168,12 @@ class _GameScreenState extends State<GameScreen> {
               }
               return WinOverlay(
                 time: _hud.elapsed,
-                personalBest: _levelBest,
+                personalBest: widget.playtest ? null : _levelBest,
+                showPersonalBest: !widget.playtest,
+                authorTime: widget.playtest
+                    ? null
+                    : widget.levels[_index].authorTime,
+                menuLabel: widget.playtest ? 'EDITOR' : 'MENU',
                 onRetry: () async {
                   await _ensureRecorded();
                   _recordedWin = false;
@@ -165,7 +188,7 @@ class _GameScreenState extends State<GameScreen> {
                 onMenu: () async {
                   await _ensureRecorded();
                   if (context.mounted) {
-                    Navigator.of(context).pop();
+                    _leave();
                   }
                 },
               );

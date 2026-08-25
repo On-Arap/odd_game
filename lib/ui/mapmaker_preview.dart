@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:odd/domain/level_map.dart';
@@ -176,8 +177,8 @@ abstract final class MapPreviewRenderer {
     Rect dst,
   ) {
     final src = SnowAutotile.src(level, col, row);
+    canvas.drawRect(dst, Paint()..color = Palette.snowFill);
     if (src == null) {
-      canvas.drawRect(dst, Paint()..color = Palette.snowFill);
       return;
     }
     _drawSprite(canvas, assets.snow, src.x, src.y, dst);
@@ -244,7 +245,8 @@ class MapMakerPreviewGrid extends StatefulWidget {
     required this.cols,
     required this.rows,
     required this.grid,
-    required this.onPaint,
+    required this.onPaintRect,
+    required this.brushColor,
     this.assets,
   });
 
@@ -252,7 +254,8 @@ class MapMakerPreviewGrid extends StatefulWidget {
   final int rows;
   final List<String> grid;
   final MapMakerAssets? assets;
-  final void Function(int col, int row) onPaint;
+  final Color brushColor;
+  final void Function(int col0, int row0, int col1, int row1) onPaintRect;
 
   static const tileSize = 16.0;
 
@@ -261,7 +264,8 @@ class MapMakerPreviewGrid extends StatefulWidget {
 }
 
 class _MapMakerPreviewGridState extends State<MapMakerPreviewGrid> {
-  bool _painting = false;
+  GridPos? _dragStart;
+  GridPos? _dragEnd;
   ui.Image? _spriteLayer;
   int _scheduledGeneration = 0;
   Timer? _rebuildTimer;
@@ -335,10 +339,56 @@ class _MapMakerPreviewGridState extends State<MapMakerPreviewGrid> {
     });
   }
 
-  void _paintAt(Offset local) {
-    final col = (local.dx / MapMakerPreviewGrid.tileSize).floor();
-    final row = (local.dy / MapMakerPreviewGrid.tileSize).floor();
-    widget.onPaint(col, row);
+  GridPos _cellAt(Offset local) {
+    final col = (local.dx / MapMakerPreviewGrid.tileSize)
+        .floor()
+        .clamp(0, widget.cols - 1);
+    final row = (local.dy / MapMakerPreviewGrid.tileSize)
+        .floor()
+        .clamp(0, widget.rows - 1);
+    return GridPos(col, row);
+  }
+
+  void _beginDrag(Offset local) {
+    final cell = _cellAt(local);
+    setState(() {
+      _dragStart = cell;
+      _dragEnd = cell;
+    });
+  }
+
+  void _updateDrag(Offset local) {
+    if (_dragStart == null) {
+      return;
+    }
+    final cell = _cellAt(local);
+    if (cell == _dragEnd) {
+      return;
+    }
+    setState(() => _dragEnd = cell);
+  }
+
+  void _commitDrag() {
+    final start = _dragStart;
+    final end = _dragEnd;
+    if (start == null || end == null) {
+      return;
+    }
+    widget.onPaintRect(start.col, start.row, end.col, end.row);
+    setState(() {
+      _dragStart = null;
+      _dragEnd = null;
+    });
+  }
+
+  void _cancelDrag() {
+    if (_dragStart == null && _dragEnd == null) {
+      return;
+    }
+    setState(() {
+      _dragStart = null;
+      _dragEnd = null;
+    });
   }
 
   @override
@@ -372,22 +422,87 @@ class _MapMakerPreviewGridState extends State<MapMakerPreviewGrid> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
-          Listener(
+          if (_dragStart != null && _dragEnd != null)
+            CustomPaint(
+              painter: _RectPreviewPainter(
+                start: _dragStart!,
+                end: _dragEnd!,
+                color: widget.brushColor,
+              ),
+            ),
+          RawGestureDetector(
             behavior: HitTestBehavior.opaque,
-            onPointerDown: (event) {
-              _painting = true;
-              _paintAt(event.localPosition);
+            gestures: {
+              _EagerPanGestureRecognizer:
+                  GestureRecognizerFactoryWithHandlers<
+                    _EagerPanGestureRecognizer
+                  >(
+                    _EagerPanGestureRecognizer.new,
+                    (recognizer) {
+                      recognizer.onStart = (details) {
+                        _beginDrag(details.localPosition);
+                      };
+                      recognizer.onUpdate = (details) {
+                        _updateDrag(details.localPosition);
+                      };
+                      recognizer.onEnd = (_) {
+                        _commitDrag();
+                      };
+                      recognizer.onCancel = _cancelDrag;
+                    },
+                  ),
             },
-            onPointerMove: (event) {
-              if (_painting) {
-                _paintAt(event.localPosition);
-              }
-            },
-            onPointerUp: (_) => _painting = false,
-            onPointerCancel: (_) => _painting = false,
           ),
         ],
       ),
     );
+  }
+}
+
+class _RectPreviewPainter extends CustomPainter {
+  _RectPreviewPainter({
+    required this.start,
+    required this.end,
+    required this.color,
+  });
+
+  final GridPos start;
+  final GridPos end;
+  final Color color;
+
+  static const _tile = MapMakerPreviewGrid.tileSize;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final left = (start.col < end.col ? start.col : end.col) * _tile;
+    final right = ((start.col < end.col ? end.col : start.col) + 1) * _tile;
+    final top = (start.row < end.row ? start.row : end.row) * _tile;
+    final bottom = ((start.row < end.row ? end.row : start.row) + 1) * _tile;
+    final rect = Rect.fromLTRB(left, top, right, bottom);
+    canvas.drawRect(rect, Paint()..color = color.withValues(alpha: 0.45));
+    canvas.drawRect(
+      rect.deflate(0.5),
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RectPreviewPainter oldDelegate) {
+    return oldDelegate.start != start ||
+        oldDelegate.end != end ||
+        oldDelegate.color != color;
+  }
+}
+
+/// Wins the arena immediately so map drags paint a rectangle instead of
+/// scrolling the preview.
+class _EagerPanGestureRecognizer extends PanGestureRecognizer {
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    super.addAllowedPointer(event);
+    resolve(GestureDisposition.accepted);
   }
 }

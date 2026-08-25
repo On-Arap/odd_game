@@ -109,12 +109,6 @@ class Player extends PositionComponent with HasGameReference {
     _updateHorizontal(dt);
     _tryJump();
 
-    if (!_grounded &&
-        (_touchingLeft || _touchingRight) &&
-        velocity.y > GameConfig.wallSlideSpeed) {
-      velocity.y = GameConfig.wallSlideSpeed;
-    }
-
     _moveX(dt);
     hud.setHorizontalSpeed(velocity.x.abs());
     _moveY(dt);

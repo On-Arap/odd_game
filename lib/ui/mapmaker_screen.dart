@@ -3,8 +3,60 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:odd/domain/level_map.dart';
+import 'package:odd/game/hud_state.dart';
 import 'package:odd/game/palette.dart';
+import 'package:odd/ui/game_screen.dart';
 import 'package:odd/ui/mapmaker_preview.dart';
+
+/// Fills the inclusive rectangle from (col0, row0) to (col1, row1).
+List<String> paintGridRect(
+  List<String> grid, {
+  required int col0,
+  required int row0,
+  required int col1,
+  required int row1,
+  required String tile,
+}) {
+  if (grid.isEmpty) {
+    return grid;
+  }
+  final cols = grid.first.length;
+  final rows = grid.length;
+  if (cols == 0 || rows == 0) {
+    return grid;
+  }
+
+  var left = col0 < col1 ? col0 : col1;
+  var right = col0 < col1 ? col1 : col0;
+  var top = row0 < row1 ? row0 : row1;
+  var bottom = row0 < row1 ? row1 : row0;
+  if (right < 0 || bottom < 0 || left >= cols || top >= rows) {
+    return grid;
+  }
+  left = left.clamp(0, cols - 1);
+  right = right.clamp(0, cols - 1);
+  top = top.clamp(0, rows - 1);
+  bottom = bottom.clamp(0, rows - 1);
+
+  var changed = false;
+  final next = List<String>.of(grid);
+  for (var row = top; row <= bottom; row++) {
+    final line = next[row];
+    final buffer = StringBuffer();
+    for (var col = 0; col < cols; col++) {
+      if (col >= left && col <= right) {
+        buffer.write(tile);
+        if (line[col] != tile) {
+          changed = true;
+        }
+      } else {
+        buffer.write(line[col]);
+      }
+    }
+    next[row] = buffer.toString();
+  }
+  return changed ? next : grid;
+}
 
 class MapMakerTile {
   const MapMakerTile({
@@ -83,6 +135,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
   String _selected = TileCodes.solid;
   int _cols = 32;
   int _rows = 18;
+  double? _authorTime;
 
   @override
   void initState() {
@@ -136,26 +189,30 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
       _cols = cols;
       _rows = rows;
       _grid = next;
+      _authorTime = null;
     });
   }
 
-  void _paintCell(int col, int row) {
-    if (col < 0 || col >= _cols || row < 0 || row >= _rows) {
-      return;
-    }
-    final line = _grid[row];
-    if (line[col] == _selected) {
+  void _paintRect(int col0, int row0, int col1, int row1) {
+    final next = paintGridRect(
+      _grid,
+      col0: col0,
+      row0: row0,
+      col1: col1,
+      row1: row1,
+      tile: _selected,
+    );
+    if (identical(next, _grid)) {
       return;
     }
     setState(() {
-      final next = List<String>.from(_grid);
-      next[row] = line.replaceRange(col, col + 1, _selected);
       _grid = next;
+      _authorTime = null;
     });
   }
 
   String _buildJson() {
-    final payload = {
+    final payload = <String, Object>{
       'format': 1,
       'id': _idController.text.trim().isEmpty
           ? 'new_map'
@@ -164,10 +221,15 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
           ? 'New Map'
           : _nameController.text.trim(),
       'tileSize': 16,
+      if (_authorTime != null) 'author_time': _jsonAuthorTime(_authorTime!),
       'grid': _grid,
     };
     const encoder = JsonEncoder.withIndent('  ');
     return encoder.convert(payload);
+  }
+
+  static double _jsonAuthorTime(double seconds) {
+    return (seconds * 100).round() / 100;
   }
 
   String? _loadFromJson(String source) {
@@ -212,11 +274,17 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
 
       final id = decoded['id'];
       final name = decoded['name'];
+      final authorTimeRaw = decoded['author_time'];
+      double? authorTime;
+      if (authorTimeRaw is num && authorTimeRaw >= 0) {
+        authorTime = authorTimeRaw.toDouble();
+      }
 
       setState(() {
         _grid = grid;
         _cols = cols;
         _rows = rows;
+        _authorTime = authorTime;
         _widthController.text = cols.toString();
         _heightController.text = rows.toString();
         if (id is String && id.isNotEmpty) {
@@ -243,6 +311,34 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
         cell == TileCodes.coin;
   }
 
+  Future<void> _play() async {
+    try {
+      final level = LevelMap.parseJson(_buildJson(), file: 'draft.json');
+      if (!mounted) {
+        return;
+      }
+      final time = await Navigator.of(context).push<double?>(
+        MaterialPageRoute<double?>(
+          builder: (_) => GameScreen(
+            levels: [level],
+            index: 0,
+            playtest: true,
+          ),
+        ),
+      );
+      if (!mounted || time == null) {
+        return;
+      }
+      setState(() {
+        if (_authorTime == null || time < _authorTime!) {
+          _authorTime = time;
+        }
+      });
+    } on FormatException catch (error) {
+      _showMessage(error.message);
+    }
+  }
+
   Future<void> _showExportDialog() async {
     final loaded = await showDialog<bool>(
       context: context,
@@ -256,6 +352,10 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
   }
 
   Future<void> _generate() async {
+    if (_authorTime == null) {
+      _showMessage('Play and complete the map before generating.');
+      return;
+    }
     final json = _buildJson();
     await Clipboard.setData(ClipboardData(text: json));
     if (!mounted) {
@@ -381,28 +481,54 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
                     rows: _rows,
                     grid: _grid,
                     assets: _assets,
-                    onPaint: _paintCell,
+                    brushColor: mapMakerTiles
+                        .firstWhere((tile) => tile.code == _selected)
+                        .color,
+                    onPaintRect: _paintRect,
                   ),
                 ),
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _showExportDialog,
-                    child: const Text('Export'),
+                Text(
+                  _authorTime == null
+                      ? 'Complete the map in Play to generate JSON.'
+                      : 'Validated ${formatRunTime(_authorTime!)}',
+                  style: TextStyle(
+                    color: _authorTime == null
+                        ? Palette.hudMuted
+                        : Palette.hud,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _generate,
-                    child: const Text('Generate'),
-                  ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _footerButton(
+                      label: 'Export',
+                      onPressed: _showExportDialog,
+                      filled: false,
+                    ),
+                    _footerButton(
+                      label: 'Play',
+                      onPressed: _play,
+                      filled: true,
+                    ),
+                    _footerButton(
+                      label: 'Generate',
+                      onPressed: _authorTime == null ? null : _generate,
+                      filled: true,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -429,6 +555,38 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
         ),
         onSubmitted: (_) => _applySize(),
       ),
+    );
+  }
+
+  Widget _footerButton({
+    required String label,
+    required VoidCallback? onPressed,
+    required bool filled,
+  }) {
+    final style = filled
+        ? FilledButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            minimumSize: const Size(0, 36),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          )
+        : OutlinedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            minimumSize: const Size(0, 36),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          );
+    if (filled) {
+      return FilledButton(
+        onPressed: onPressed,
+        style: style,
+        child: Text(label),
+      );
+    }
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: style,
+      child: Text(label),
     );
   }
 }

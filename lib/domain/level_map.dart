@@ -57,6 +57,7 @@ class LevelMap {
     required this.grid,
     required this.spawn,
     required this.coins,
+    this.authorTime,
   });
 
   final int format;
@@ -67,6 +68,7 @@ class LevelMap {
   final List<String> grid;
   final GridPos spawn;
   final List<GridPos> coins;
+  final double? authorTime;
 
   int get cols => grid.first.length;
   int get rows => grid.length;
@@ -120,6 +122,7 @@ class LevelMap {
     final name = json['name'];
     final tileSize = json['tileSize'];
     final gridRaw = json['grid'];
+    final authorTimeRaw = json['author_time'];
 
     if (id is! String || id.isEmpty) {
       throw FormatException('Level $file is missing a string "id".');
@@ -132,6 +135,10 @@ class LevelMap {
     }
     if (gridRaw is! List || gridRaw.isEmpty) {
       throw FormatException('Level $file is missing a non-empty "grid".');
+    }
+    if (authorTimeRaw != null &&
+        (authorTimeRaw is! num || authorTimeRaw < 0)) {
+      throw FormatException('Level $file has an invalid "author_time".');
     }
 
     final grid = gridRaw.map((row) {
@@ -199,6 +206,9 @@ class LevelMap {
       grid: grid,
       spawn: spawn,
       coins: coins,
+      authorTime: authorTimeRaw == null
+          ? null
+          : (authorTimeRaw as num).toDouble(),
     );
   }
 }

@@ -22,10 +22,10 @@ abstract final class GameConfig {
   static const jumpSpeed = -540.0;
   static const wallJumpSpeed = -500.0;
   static const wallJumpX = 240.0;
-  static const wallSlideSpeed = 130.0;
 
   /// Extra gravity while rising after jump is released. 1 = full arc.
-  static const jumpReleaseGravity = 2.8;
+  /// Higher = shorter tap jump. Full hop (button held) is unchanged.
+  static const jumpReleaseGravity = 5.0;
 
   /// Full air speed for this long, then horizontal speed drops toward [airMinSpeedFactor].
   static const airFullSpeedTime = 0.2;

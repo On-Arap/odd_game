@@ -114,6 +114,7 @@ class OddGame extends FlameGame with HasKeyboardHandlerComponents {
           GroundBlock.sprite(
             position: at,
             size: size,
+            background: Palette.snowFill,
             sprite: Sprite(
               snow,
               srcPosition: Vector2(src.x, src.y),

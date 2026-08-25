@@ -10,6 +10,9 @@ class WinOverlay extends StatelessWidget {
     required this.onRetry,
     required this.onMenu,
     this.onNext,
+    this.menuLabel = 'MENU',
+    this.showPersonalBest = true,
+    this.authorTime,
   });
 
   final double time;
@@ -17,9 +20,15 @@ class WinOverlay extends StatelessWidget {
   final VoidCallback onRetry;
   final VoidCallback onMenu;
   final VoidCallback? onNext;
+  final String menuLabel;
+  final bool showPersonalBest;
+  final double? authorTime;
 
   bool get _isPersonalBest =>
-      personalBest == null || time <= personalBest!;
+      showPersonalBest && (personalBest == null || time <= personalBest!);
+
+  bool get _beatAuthor =>
+      authorTime != null && time <= authorTime!;
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +75,7 @@ class WinOverlay extends StatelessWidget {
                       fontFeatures: [FontFeature.tabularFigures()],
                     ),
                   ),
-                  if (!_isPersonalBest) ...[
+                  if (showPersonalBest && !_isPersonalBest) ...[
                     const SizedBox(height: 6),
                     Text(
                       'PB ${formatRunTime(personalBest!)}',
@@ -76,6 +85,13 @@ class WinOverlay extends StatelessWidget {
                         color: Palette.hudMuted,
                         fontFeatures: [FontFeature.tabularFigures()],
                       ),
+                    ),
+                  ],
+                  if (showPersonalBest && authorTime != null) ...[
+                    const SizedBox(height: 16),
+                    _AuthorTimeMedal(
+                      beaten: _beatAuthor,
+                      authorTime: authorTime!,
                     ),
                   ],
                   const SizedBox(height: 22),
@@ -95,7 +111,7 @@ class WinOverlay extends StatelessWidget {
                         )
                       else
                         Expanded(
-                          child: _WinButton(label: 'MENU', onTap: onMenu),
+                          child: _WinButton(label: menuLabel, onTap: onMenu),
                         ),
                     ],
                   ),
@@ -103,7 +119,7 @@ class WinOverlay extends StatelessWidget {
                     const SizedBox(height: 10),
                     TextButton(
                       onPressed: onMenu,
-                      child: const Text('MENU'),
+                      child: Text(menuLabel),
                     ),
                   ],
                 ],
@@ -112,6 +128,42 @@ class WinOverlay extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AuthorTimeMedal extends StatelessWidget {
+  const _AuthorTimeMedal({
+    required this.beaten,
+    required this.authorTime,
+  });
+
+  final bool beaten;
+  final double authorTime;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = beaten ? Palette.coin : Palette.hudMuted;
+    return Column(
+      children: [
+        Icon(
+          Icons.emoji_events,
+          color: color,
+          size: 42,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          beaten ? 'Author Time beaten' : 'Author Time ${formatRunTime(authorTime)}',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.4,
+            color: color,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
     );
   }
 }
