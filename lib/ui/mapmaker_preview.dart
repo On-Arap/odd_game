@@ -7,30 +7,32 @@ import 'package:flutter/services.dart';
 import 'package:odd/domain/level_map.dart';
 import 'package:odd/game/config.dart';
 import 'package:odd/game/palette.dart';
-import 'package:odd/game/world/ice_autotile.dart';
-import 'package:odd/game/world/snow_autotile.dart';
 
 class MapMakerAssets {
   const MapMakerAssets({
-    required this.snow,
+    required this.bloc,
+    required this.ice,
     required this.coin,
     required this.player,
   });
 
-  final ui.Image snow;
+  final ui.Image bloc;
+  final ui.Image ice;
   final ui.Image coin;
   final ui.Image player;
 
   static Future<MapMakerAssets> load() async {
     final results = await Future.wait<ui.Image>([
-      _loadImage('assets/sprites/tilesets/tileset_snow.png'),
+      _loadImage('assets/sprites/tilesets/bloc.png'),
+      _loadImage('assets/sprites/tilesets/ice.png'),
       _loadImage('assets/sprites/objects/coin_gold.png'),
       _loadImage('assets/sprites/player/penguin.png'),
     ]);
     return MapMakerAssets(
-      snow: results[0],
-      coin: results[1],
-      player: results[2],
+      bloc: results[0],
+      ice: results[1],
+      coin: results[2],
+      player: results[3],
     );
   }
 
@@ -43,7 +45,7 @@ class MapMakerAssets {
 
   static Future<MapMakerAssets> placeholder() async {
     final image = await _blankImage();
-    return MapMakerAssets(snow: image, coin: image, player: image);
+    return MapMakerAssets(bloc: image, ice: image, coin: image, player: image);
   }
 
   static Future<ui.Image> _blankImage() async {
@@ -130,7 +132,7 @@ abstract final class MapPreviewRenderer {
     final canvas = Canvas(recorder);
     for (var row = 0; row < level.rows; row++) {
       for (var col = 0; col < level.cols; col++) {
-        _paintCell(canvas, level, grid, assets, col, row);
+        _paintCell(canvas, grid, assets, col, row);
       }
     }
 
@@ -140,7 +142,6 @@ abstract final class MapPreviewRenderer {
 
   static void _paintCell(
     Canvas canvas,
-    LevelMap level,
     List<String> grid,
     MapMakerAssets assets,
     int col,
@@ -151,9 +152,9 @@ abstract final class MapPreviewRenderer {
 
     switch (cell) {
       case TileCodes.solid:
-        _paintSnow(canvas, level, assets, col, row, dst);
+        _paintTile(canvas, assets.bloc, dst);
       case TileCodes.ice:
-        _paintIce(canvas, level, assets, col, row, dst);
+        _paintTile(canvas, assets.ice, dst);
       case TileCodes.mud:
         canvas.drawRect(
           dst,
@@ -168,33 +169,16 @@ abstract final class MapPreviewRenderer {
     }
   }
 
-  static void _paintSnow(
-    Canvas canvas,
-    LevelMap level,
-    MapMakerAssets assets,
-    int col,
-    int row,
-    Rect dst,
-  ) {
-    final src = SnowAutotile.src(level, col, row);
-    canvas.drawRect(dst, Paint()..color = Palette.snowFill);
-    if (src == null) {
-      return;
-    }
-    _drawSprite(canvas, assets.snow, src.x, src.y, dst);
-  }
-
-  static void _paintIce(
-    Canvas canvas,
-    LevelMap level,
-    MapMakerAssets assets,
-    int col,
-    int row,
-    Rect dst,
-  ) {
-    canvas.drawRect(dst, Paint()..color = Palette.snowFill);
-    final src = IceAutotile.src(level, col, row);
-    _drawSprite(canvas, assets.snow, src.x, src.y, dst);
+  static void _paintTile(Canvas canvas, ui.Image image, Rect dst) {
+    _drawSprite(
+      canvas,
+      image,
+      0,
+      0,
+      dst,
+      image.width.toDouble(),
+      image.height.toDouble(),
+    );
   }
 
   static void _paintCoin(Canvas canvas, MapMakerAssets assets, int col, int row) {
