@@ -43,8 +43,6 @@ class Player extends PositionComponent with HasGameReference {
   double _coyote = 0;
   double _wallCoyote = 0;
   bool _wasGrounded = false;
-  double _airTime = 0;
-  double _takeoffSpeed = 0;
 
   /// Boîte de collision = taille du composant.
   Rect get hitbox {
@@ -160,10 +158,9 @@ class Player extends PositionComponent with HasGameReference {
     }
   }
 
-  /// Accel / décél au sol (sauf glace) ; en l'air on garde l'élan du décollage.
+  /// Accel / décél au sol (sauf glace) ; en l'air, drift vers [airMaxSpeed].
   void _updateHorizontal(double dt) {
     if (_grounded) {
-      _airTime = 0;
       final surface = grid.surfaceBelow(_feetProbe);
       // La glace ne freine ni n'accélère.
       if (surface != GroundSurface.ice) {
@@ -177,18 +174,19 @@ class Player extends PositionComponent with HasGameReference {
           dt,
         );
       }
-      _takeoffSpeed = velocity.x.abs();
       return;
     }
 
-    _airTime += dt;
-    // En l'air, run maintient l'élan (qui diminue avec le temps).
-    if (input.runHeld) {
-      velocity.x =
-          _facing * _takeoffSpeed * GameConfig.airSpeedFactor(_airTime);
-    } else {
-      velocity.x = PlayerRules.approach(velocity.x, 0, GameConfig.runDecel, dt);
-    }
+    // Run : on se rapproche du plafond aérien. Relâché : on glisse vers 0.
+    velocity.x = velocity.x
+        .clamp(-GameConfig.airMaxSpeed, GameConfig.airMaxSpeed)
+        .toDouble();
+    velocity.x = PlayerRules.approach(
+      velocity.x,
+      input.runHeld ? _facing * GameConfig.airMaxSpeed : 0,
+      input.runHeld ? GameConfig.airAccel : GameConfig.airDecel,
+      dt,
+    );
   }
 
   /// Saut au sol (ou coyote) prioritaire, sinon wall-jump.
@@ -219,8 +217,6 @@ class Player extends PositionComponent with HasGameReference {
     velocity
       ..x = _facing * GameConfig.wallJumpX
       ..y = GameConfig.wallJumpSpeed;
-    _takeoffSpeed = velocity.x.abs();
-    _airTime = 0;
     _wallCoyote = 0;
     position.x += _facing * 2;
     _separateFromSolids();

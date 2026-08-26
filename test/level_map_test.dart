@@ -128,21 +128,17 @@ void main() {
     );
   });
 
-  test('air speed uses takeoff speed, not max run speed', () {
-    const takeoff = 100.0;
+  test('air accel reaches airMaxSpeed from rest in airAccelTime', () {
     expect(
-      takeoff * GameConfig.airSpeedFactor(0),
-      100,
+      _approachFor(0, GameConfig.airMaxSpeed, GameConfig.airAccel, GameConfig.airAccelTime),
+      closeTo(GameConfig.airMaxSpeed, 0.001),
     );
+  });
+
+  test('air decel stops from airMaxSpeed in airDecelTime', () {
     expect(
-      takeoff * GameConfig.airSpeedFactor(GameConfig.airFullSpeedTime),
-      100,
-    );
-    expect(
-      takeoff * GameConfig.airSpeedFactor(
-        GameConfig.airFullSpeedTime + GameConfig.airDecayTime,
-      ),
-      takeoff * GameConfig.airMinSpeedFactor,
+      _approachFor(GameConfig.airMaxSpeed, 0, GameConfig.airDecel, GameConfig.airDecelTime),
+      closeTo(0, 0.001),
     );
   });
 
