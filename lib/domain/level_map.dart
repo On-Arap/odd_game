@@ -9,6 +9,7 @@ abstract final class TileCodes {
   static const player = 'P';
   static const coin = 'C';
 
+  /// `#`, `I` et `M` bloquent le joueur.
   static bool isSolid(String cell) {
     return cell == solid || cell == ice || cell == mud;
   }
@@ -16,6 +17,7 @@ abstract final class TileCodes {
 
 enum GroundSurface { none, solid, ice, mud }
 
+/// Type de sol sous les pieds (vitesse, glisse).
 GroundSurface surfaceOf(String cell) {
   switch (cell) {
     case TileCodes.ice:
@@ -76,6 +78,7 @@ class LevelMap {
   double get worldHeight => rows * tileSize;
   int get coinCount => coins.length;
 
+  /// Hors carte : murs infinis à gauche/droite/haut ; le vide en bas se traverse.
   bool isSolid(int col, int row) {
     if (col < 0 || col >= cols || row < 0) {
       return true;
@@ -86,6 +89,7 @@ class LevelMap {
     return TileCodes.isSolid(grid[row][col]);
   }
 
+  /// Caractère de la case, ou mur / vide hors limites.
   String tileAt(int col, int row) {
     if (col < 0 || col >= cols || row < 0) {
       return TileCodes.solid;
@@ -96,6 +100,7 @@ class LevelMap {
     return grid[row][col];
   }
 
+  /// Parse le JSON texte d'un fichier de map.
   factory LevelMap.parseJson(
     String source, {
     required String file,
@@ -107,6 +112,7 @@ class LevelMap {
     return LevelMap.fromJson(decoded, file: file);
   }
 
+  /// Valide le JSON, trouve P et les C, construit le [LevelMap].
   factory LevelMap.fromJson(
     Map<String, dynamic> json, {
     required String file,
@@ -152,6 +158,7 @@ class LevelMap {
     if (cols == 0) {
       throw FormatException('Level $file has an empty first grid row.');
     }
+    // Toutes les lignes doivent avoir la même largeur.
     for (var r = 0; r < grid.length; r++) {
       if (grid[r].length != cols) {
         throw FormatException(
@@ -163,6 +170,7 @@ class LevelMap {
     GridPos? spawn;
     final coins = <GridPos>[];
 
+    // Un seul P, au moins un C, tuiles connues seulement.
     for (var row = 0; row < grid.length; row++) {
       for (var col = 0; col < cols; col++) {
         final cell = grid[row][col];

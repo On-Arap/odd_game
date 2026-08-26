@@ -7,6 +7,7 @@ import 'package:odd/ui/menu_screen.dart';
 class OddApp extends StatelessWidget {
   const OddApp({super.key});
 
+  /// `/` partout ; `/mapmaker` seulement sur le web.
   static String initialRoute() {
     if (!kIsWeb) {
       return '/';
@@ -37,6 +38,7 @@ class OddApp extends StatelessWidget {
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/mapmaker':
+            // L'éditeur n'existe pas sur mobile : on renvoie au menu.
             if (!kIsWeb) {
               return MaterialPageRoute<void>(
                 builder: (_) => const MenuScreen(),
@@ -56,6 +58,7 @@ class OddApp extends StatelessWidget {
   }
 }
 
+/// Landscape immersif sauf dans l'éditeur web.
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
   final mapMaker = kIsWeb && OddApp.initialRoute() == '/mapmaker';

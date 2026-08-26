@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class BestTimesStore {
   static const _key = 'personal_bests_v1';
 
+  /// Lit les PB depuis SharedPreferences.
   Future<BestTimes> load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
@@ -22,6 +23,7 @@ class BestTimesStore {
     });
   }
 
+  /// Enregistre un run s'il bat le PB, puis persiste.
   Future<BestTimes> record(String levelId, double time) async {
     final current = await load();
     final next = current.record(levelId, time);

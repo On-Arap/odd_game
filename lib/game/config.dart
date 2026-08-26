@@ -32,6 +32,7 @@ abstract final class GameConfig {
   static const airDecayTime = 1.5;
   static const airMinSpeedFactor = 0.25;
 
+  /// Facteur de vitesse aérienne : 1 un moment, puis chute vers [airMinSpeedFactor].
   static double airSpeedFactor(double airTime) {
     if (airTime <= airFullSpeedTime) {
       return 1;

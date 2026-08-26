@@ -1,6 +1,7 @@
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 
+/// État HUD partagé (pièces, chrono, victoire) notifié à Flutter.
 class HudState extends ChangeNotifier {
   int coinsCollected = 0;
   int coinsTotal = 0;
@@ -11,6 +12,7 @@ class HudState extends ChangeNotifier {
   double _hudEmit = 0;
   bool _notifyScheduled = false;
 
+  /// Reset pour une nouvelle tentative.
   void begin({required int coins}) {
     coinsCollected = 0;
     coinsTotal = coins;
@@ -22,6 +24,7 @@ class HudState extends ChangeNotifier {
     _notify();
   }
 
+  /// Avance le chrono (rafraîchit l'UI ~20 fois/s).
   void tick(double dt) {
     if (won || !timerRunning) {
       return;
@@ -34,6 +37,7 @@ class HudState extends ChangeNotifier {
     }
   }
 
+  /// Démarre le chrono au premier input.
   void startTimer() {
     if (timerRunning || won) {
       return;
@@ -41,6 +45,7 @@ class HudState extends ChangeNotifier {
     timerRunning = true;
   }
 
+  /// +1 pièce ; victoire si le compte est plein.
   void collectCoin() {
     if (won) {
       return;
@@ -52,6 +57,7 @@ class HudState extends ChangeNotifier {
     _notify();
   }
 
+  /// Ignore les micro-variations de vitesse (HUD).
   void setHorizontalSpeed(double speed) {
     if ((speed - horizontalSpeed).abs() < 0.5) {
       return;
@@ -60,8 +66,7 @@ class HudState extends ChangeNotifier {
     _notify();
   }
 
-  /// Flame loads and updates during Flutter layout. Never notify synchronously
-  /// from that path or overlay widgets will setState during build.
+  /// Flame update pendant le layout Flutter : notify en post-frame si besoin.
   void _notify() {
     if (_notifyScheduled) {
       return;
@@ -80,6 +85,7 @@ class HudState extends ChangeNotifier {
   }
 }
 
+/// Affiche `s.xx` ou `m:ss.xx`.
 String formatRunTime(double seconds) {
   final whole = seconds.floor();
   final minutes = whole ~/ 60;

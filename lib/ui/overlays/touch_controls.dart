@@ -15,10 +15,12 @@ class _TouchControlsState extends State<TouchControls> {
   final Set<int> _runPointers = {};
   final Set<int> _jumpPointers = {};
 
+  /// Run maintenu tant qu'au moins un doigt est sur le pad.
   void _syncRun() {
     widget.input.runHeld = _runPointers.isNotEmpty && widget.input.enabled;
   }
 
+  /// Saut maintenu tant qu'un doigt est sur le pad jump.
   void _syncJump() {
     widget.input.setTouchJump(_jumpPointers.isNotEmpty);
   }

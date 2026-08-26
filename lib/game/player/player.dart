@@ -7,8 +7,10 @@ import 'package:odd/game/collision/collision_grid.dart';
 import 'package:odd/game/config.dart';
 import 'package:odd/game/hud_state.dart';
 import 'package:odd/game/input/game_input.dart';
+import 'package:odd/game/sprites.dart';
 import 'package:odd/game/world/coin.dart';
 
+/// Pingouin : physique, collisions, saut / wall-jump, pièces.
 class Player extends PositionComponent with HasGameReference {
   Player({
     required this.grid,
@@ -44,6 +46,7 @@ class Player extends PositionComponent with HasGameReference {
   double _airTime = 0;
   double _takeoffSpeed = 0;
 
+  /// Boîte de collision = taille du composant.
   Rect get hitbox {
     return Rect.fromCenter(
       center: Offset(position.x, position.y),
@@ -52,13 +55,15 @@ class Player extends PositionComponent with HasGameReference {
     );
   }
 
+  /// Découpe 4 frames du pingouin dans la feuille 128×32.
   @override
   Future<void> onLoad() async {
     const art = 16.0;
     const insetX = 8.0;
     const insetY = 16.0;
     const slot = 32.0;
-    final sheet = game.images.fromCache('player/penguin.png');
+    final sheet = game.images.fromCache(GameSprites.player);
+    // Une frame par slot de 32 px.
     final frames = [
       for (var i = 0; i < 4; i++)
         Sprite(
@@ -76,6 +81,7 @@ class Player extends PositionComponent with HasGameReference {
     add(_sprite);
   }
 
+  /// Bande sous les pieds pour détecter le sol.
   Rect get _feetProbe {
     return Rect.fromLTRB(
       hitbox.left + GameConfig.skin,
@@ -85,9 +91,11 @@ class Player extends PositionComponent with HasGameReference {
     );
   }
 
+  /// Un tick : gravité, saut, déplacement, pièces, squash, mort.
   @override
   void update(double dt) {
     super.update(dt);
+    // Plus de contrôle une fois le niveau fini.
     if (hud.won) {
       return;
     }
@@ -95,10 +103,12 @@ class Player extends PositionComponent with HasGameReference {
     dt = dt.clamp(0, GameConfig.maxDt);
 
     velocity.y += GameConfig.gravity * dt;
+    // Relâcher le saut en montée raccourcit l'arc (short hop).
     if (velocity.y < 0 && !input.jumpHeld) {
       velocity.y +=
           GameConfig.gravity * (GameConfig.jumpReleaseGravity - 1) * dt;
     }
+    // Plafond de vitesse de chute.
     if (velocity.y > GameConfig.maxFallSpeed) {
       velocity.y = GameConfig.maxFallSpeed;
     }
@@ -116,21 +126,25 @@ class Player extends PositionComponent with HasGameReference {
     _collectCoins();
     _syncSprite();
 
+    // Tombé sous la carte → restart.
     if (position.y > grid.level.worldHeight + GameConfig.deathMargin) {
       onDeath();
       return;
     }
 
+    // Atterrissage : squash horizontal.
     if (_grounded && !_wasGrounded) {
       scale.setValues(1.18, 0.82);
     }
     _wasGrounded = _grounded;
 
+    // Retour progressif à l'échelle 1.
     scale
       ..x += (1 - scale.x) * dt * 14
       ..y += (1 - scale.y) * dt * 14;
   }
 
+  /// Coyote au sol et coyote mural (saut un peu après avoir quitté).
   void _updateCoyote(double dt) {
     if (_grounded) {
       _coyote = GameConfig.coyoteTime;
@@ -146,10 +160,12 @@ class Player extends PositionComponent with HasGameReference {
     }
   }
 
+  /// Accel / décél au sol (sauf glace) ; en l'air on garde l'élan du décollage.
   void _updateHorizontal(double dt) {
     if (_grounded) {
       _airTime = 0;
       final surface = grid.surfaceBelow(_feetProbe);
+      // La glace ne freine ni n'accélère.
       if (surface != GroundSurface.ice) {
         final maxSpeed = surface == GroundSurface.mud
             ? GameConfig.mudSpeed
@@ -166,23 +182,20 @@ class Player extends PositionComponent with HasGameReference {
     }
 
     _airTime += dt;
+    // En l'air, run maintient l'élan (qui diminue avec le temps).
     if (input.runHeld) {
       velocity.x =
           _facing * _takeoffSpeed * GameConfig.airSpeedFactor(_airTime);
     } else {
-      velocity.x = PlayerRules.approach(
-        velocity.x,
-        0,
-        GameConfig.runDecel,
-        dt,
-      );
+      velocity.x = PlayerRules.approach(velocity.x, 0, GameConfig.runDecel, dt);
     }
   }
 
+  /// Saut au sol (ou coyote) prioritaire, sinon wall-jump.
   void _tryJump() {
     final canGroundJump = _grounded || _coyote > 0;
-    final canWallJump = !canGroundJump &&
-        (_touchingLeft || _touchingRight || _wallCoyote > 0);
+    final canWallJump =
+        !canGroundJump && (_touchingLeft || _touchingRight || _wallCoyote > 0);
     if (!input.wantsJump) {
       return;
     }
@@ -215,12 +228,14 @@ class Player extends PositionComponent with HasGameReference {
     scale.setValues(0.82, 1.22);
   }
 
+  /// Recale X puis Y si on est déjà dans un bloc (spawn, wall-jump).
   void _separateFromSolids() {
     _resolveX();
     _resolveY();
     _clampX();
   }
 
+  /// Avance en X puis éjecte des murs ; stoppe la vitesse si on a heurté.
   void _moveX(double dt) {
     position.x += velocity.x * dt;
     final attempted = position.x;
@@ -231,22 +246,26 @@ class Player extends PositionComponent with HasGameReference {
     _clampX();
   }
 
+  /// Avance en Y : atterrissage (solide au-dessus) ou plafond.
   void _moveY(double dt) {
     _grounded = false;
     position.y += velocity.y * dt;
     final attempted = position.y;
     _resolveY();
+    // On a été poussé vers le haut → on est sur un sol.
     if (position.y < attempted - 0.001) {
       _grounded = true;
       if (velocity.y > 0) {
         velocity.y = 0;
       }
     } else if (position.y > attempted + 0.001) {
+      // Poussé vers le bas → tête contre un plafond.
       if (velocity.y < 0) {
         velocity.y = 0;
       }
     }
 
+    // Filet : pieds encore dans un solide.
     if (!_grounded) {
       _grounded = grid.overlapsSolid(_feetProbe);
       if (_grounded && velocity.y > 0) {
@@ -255,6 +274,7 @@ class Player extends PositionComponent with HasGameReference {
     }
   }
 
+  /// Éjecte hors des blocs sur l'axe X.
   void _resolveX() {
     position.x = grid.separateX(
       centerX: position.x,
@@ -265,6 +285,7 @@ class Player extends PositionComponent with HasGameReference {
     );
   }
 
+  /// Éjecte hors des blocs sur l'axe Y.
   void _resolveY() {
     position.y = grid.separateY(
       centerX: position.x,
@@ -275,11 +296,13 @@ class Player extends PositionComponent with HasGameReference {
     );
   }
 
+  /// Empêche de sortir des bords gauche / droit de la carte.
   void _clampX() {
     final halfW = size.x / 2;
     position.x = position.x.clamp(halfW, grid.level.worldWidth - halfW);
   }
 
+  /// Sondes à gauche et à droite pour le wall-jump.
   void _probeWalls() {
     final inset = GameConfig.skin + 2;
     _touchingLeft = grid.overlapsSolid(
@@ -300,6 +323,7 @@ class Player extends PositionComponent with HasGameReference {
     );
   }
 
+  /// Flip, course animée, ou pose / saut figé.
   void _syncSprite() {
     if (!isLoaded) {
       return;
@@ -312,6 +336,7 @@ class Player extends PositionComponent with HasGameReference {
     }
   }
 
+  /// Ramasse les pièces dont la hitbox chevauche le joueur.
   void _collectCoins() {
     for (final coin in coins) {
       if (coin.collected) {
@@ -323,5 +348,4 @@ class Player extends PositionComponent with HasGameReference {
       }
     }
   }
-
 }

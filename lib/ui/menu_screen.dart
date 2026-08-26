@@ -28,6 +28,7 @@ class _MenuScreenState extends State<MenuScreen> {
     _load();
   }
 
+  /// Charge les maps bundle + les PB.
   Future<void> _load() async {
     try {
       final levels = await LevelRepository().loadAll();
@@ -48,6 +49,7 @@ class _MenuScreenState extends State<MenuScreen> {
     }
   }
 
+  /// Ouvre le niveau puis rafraîchit les temps au retour.
   Future<void> _openLevel(List<LevelMap> levels, int index) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(

@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:odd/domain/level_map.dart';
 
+/// Requêtes de collision sur la grille du niveau (pas de physique ici).
 class CollisionGrid {
   CollisionGrid(this.level);
 
@@ -9,12 +10,12 @@ class CollisionGrid {
 
   double get tileSize => level.tileSize;
 
+  /// True s'il y a au moins un bloc dans [hitbox].
   bool overlapsSolid(Rect hitbox) {
     return _solidTiles(hitbox).isNotEmpty;
   }
 
-  /// Push [centerX] out of solids. Uses the tile's nearer face, not velocity,
-  /// so a wall jump while slightly embedded cannot eject you through the wall.
+  /// Pousse [centerX] hors des solides (face la plus proche, pas la vélocité).
   double separateX({
     required double centerX,
     required double centerY,
@@ -23,6 +24,7 @@ class CollisionGrid {
     required double skin,
   }) {
     var x = centerX;
+    // Jusqu'à 8 passes si on chevauche plusieurs blocs.
     for (var i = 0; i < 8; i++) {
       final probe = Rect.fromLTRB(
         x - halfWidth,
@@ -43,6 +45,7 @@ class CollisionGrid {
         },
       );
       const epsilon = 0.05;
+      // Éjecte vers la gauche ou la droite selon le centre du bloc.
       if (x < tile.center.dx) {
         x = tile.left - halfWidth - epsilon;
       } else {
@@ -52,6 +55,7 @@ class CollisionGrid {
     return _nudgeXTowardInterior(x, centerY, halfWidth, halfHeight, skin);
   }
 
+  /// Pousse [centerY] hors des solides (même logique, axe vertical).
   double separateY({
     required double centerX,
     required double centerY,
@@ -89,6 +93,7 @@ class CollisionGrid {
     return y;
   }
 
+  /// Bloc dans lequel on est le plus enfoncé.
   Rect _deepestTile(
     List<Rect> tiles, {
     required double Function(Rect tile) penetration,
@@ -105,6 +110,7 @@ class CollisionGrid {
     return best;
   }
 
+  /// Si on est encore coincé, recule vers le centre de la carte.
   double _nudgeXTowardInterior(
     double x,
     double centerY,
@@ -130,6 +136,7 @@ class CollisionGrid {
     return x.clamp(halfWidth, level.worldWidth - halfWidth);
   }
 
+  /// Rectangles des cellules solides qui touchent [hitbox].
   List<Rect> _solidTiles(Rect hitbox) {
     final tiles = <Rect>[];
     _forEachCell(hitbox, (col, row) {
@@ -142,6 +149,7 @@ class CollisionGrid {
     return tiles;
   }
 
+  /// Surface sous les pieds : la boue l'emporte sur la glace.
   GroundSurface surfaceBelow(Rect feet) {
     var surface = GroundSurface.none;
     _forEachCell(feet, (col, row) {
@@ -165,6 +173,7 @@ class CollisionGrid {
     return surface;
   }
 
+  /// Visite chaque cellule de grille couverte par [box].
   void _forEachCell(Rect box, void Function(int col, int row) visit) {
     if (box.width <= 0 || box.height <= 0) {
       return;

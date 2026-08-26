@@ -10,6 +10,7 @@ abstract final class PlayerRules {
     double dt,
   ) {
     final step = acceleration * dt;
+    // Monte ou descend vers la cible sans la dépasser.
     if (current < target) {
       return math.min(current + step, target);
     }
@@ -33,6 +34,7 @@ abstract final class PlayerRules {
     if (touchingRight && !touchingLeft) {
       return -1;
     }
+    // Plus collé : inverse le dernier mur connu, sinon le facing actuel.
     if (lastWall != 0) {
       return -lastWall;
     }

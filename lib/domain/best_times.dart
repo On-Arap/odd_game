@@ -6,7 +6,7 @@ class BestTimes {
 
   double? forLevel(String id) => byLevelId[id];
 
-  /// Sum of PBs for [levelIds], or null if any map is missing a time.
+  /// Somme des PB, ou null si une map n'a pas encore de temps.
   double? totalFor(Iterable<String> levelIds) {
     var sum = 0.0;
     for (final id in levelIds) {
@@ -19,7 +19,7 @@ class BestTimes {
     return sum;
   }
 
-  /// Keep the faster time. Equal times do not replace the stored PB.
+  /// Garde le temps le plus rapide (égalité : on ne remplace pas).
   BestTimes record(String levelId, double time) {
     final current = byLevelId[levelId];
     if (current != null && current <= time) {

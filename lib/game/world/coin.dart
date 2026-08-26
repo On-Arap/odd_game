@@ -2,7 +2,9 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flame/components.dart';
+import 'package:odd/game/sprites.dart';
 
+/// Pièce animée qui flotte un peu, puis disparaît à la collecte.
 class Coin extends SpriteAnimationComponent with HasGameReference {
   Coin({required Vector2 center})
     : _origin = center.clone(),
@@ -17,6 +19,7 @@ class Coin extends SpriteAnimationComponent with HasGameReference {
   double _time = 0;
   bool collected = false;
 
+  /// Hitbox un peu plus petite que le sprite.
   Rect get hitbox {
     return Rect.fromCenter(
       center: Offset(position.x, position.y),
@@ -25,10 +28,11 @@ class Coin extends SpriteAnimationComponent with HasGameReference {
     );
   }
 
+  /// 8 frames de `coin_gold.png`.
   @override
   Future<void> onLoad() async {
     animation = SpriteAnimation.fromFrameData(
-      game.images.fromCache('objects/coin_gold.png'),
+      game.images.fromCache(GameSprites.coin),
       SpriteAnimationData.sequenced(
         amount: 8,
         stepTime: 0.08,
@@ -37,11 +41,13 @@ class Coin extends SpriteAnimationComponent with HasGameReference {
     );
   }
 
+  /// Marque la pièce et la retire du monde.
   void collect() {
     collected = true;
     removeFromParent();
   }
 
+  /// Oscillation verticale autour du point d'origine.
   @override
   void update(double dt) {
     super.update(dt);

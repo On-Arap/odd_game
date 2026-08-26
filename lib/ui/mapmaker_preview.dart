@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:odd/domain/level_map.dart';
 import 'package:odd/game/config.dart';
 import 'package:odd/game/palette.dart';
+import 'package:odd/game/sprites.dart';
 
 class MapMakerAssets {
   const MapMakerAssets({
@@ -23,13 +24,22 @@ class MapMakerAssets {
   final ui.Image coin;
   final ui.Image player;
 
+  /// Image du sol pour `#` / `I` / `M`.
+  ui.Image? tileSprite(String cell) => switch (GameSprites.tile(cell)) {
+    GameSprites.bloc => bloc,
+    GameSprites.ice => ice,
+    GameSprites.mud => mud,
+    _ => null,
+  };
+
+  /// Charge les PNG utilisés par la preview.
   static Future<MapMakerAssets> load() async {
     final results = await Future.wait<ui.Image>([
-      _loadImage('assets/sprites/tilesets/bloc.png'),
-      _loadImage('assets/sprites/tilesets/ice.png'),
-      _loadImage('assets/sprites/tilesets/mud.png'),
-      _loadImage('assets/sprites/objects/coin_gold.png'),
-      _loadImage('assets/sprites/player/penguin.png'),
+      _loadImage(GameSprites.bundle(GameSprites.bloc)),
+      _loadImage(GameSprites.bundle(GameSprites.ice)),
+      _loadImage(GameSprites.bundle(GameSprites.mud)),
+      _loadImage(GameSprites.bundle(GameSprites.coin)),
+      _loadImage(GameSprites.bundle(GameSprites.player)),
     ]);
     return MapMakerAssets(
       bloc: results[0],
@@ -40,6 +50,7 @@ class MapMakerAssets {
     );
   }
 
+  /// Décode un PNG du bundle.
   static Future<ui.Image> _loadImage(String path) async {
     final data = await rootBundle.load(path);
     final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
@@ -47,6 +58,7 @@ class MapMakerAssets {
     return frame.image;
   }
 
+  /// Images 1×1 noires pour les tests widget.
   static Future<MapMakerAssets> placeholder() async {
     final image = await _blankImage();
     return MapMakerAssets(
@@ -66,19 +78,6 @@ class MapMakerAssets {
   }
 }
 
-LevelMap previewLevel(List<String> grid) {
-  return LevelMap(
-    format: 1,
-    id: 'preview',
-    name: 'Preview',
-    file: 'preview.json',
-    tileSize: 16,
-    grid: grid,
-    spawn: const GridPos(0, 0),
-    coins: const [],
-  );
-}
-
 /// Fast grid lines + checker so the editor is usable before sprites finish.
 class MapGridLinesPainter extends CustomPainter {
   MapGridLinesPainter({required this.cols, required this.rows});
@@ -88,6 +87,7 @@ class MapGridLinesPainter extends CustomPainter {
 
   static const _tile = MapMakerPreviewGrid.tileSize;
 
+  /// Damier + lignes de grille.
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = Palette.background);
@@ -127,21 +127,23 @@ class MapGridLinesPainter extends CustomPainter {
 abstract final class MapPreviewRenderer {
   static const _tile = MapMakerPreviewGrid.tileSize;
 
+  /// Dessine toute la grille dans une image (tuiles, pièces, spawn).
   static Future<ui.Image> rasterize({
     required List<String> grid,
     required MapMakerAssets assets,
   }) async {
-    final level = previewLevel(grid);
-    final width = (level.cols * _tile).ceil();
-    final height = (level.rows * _tile).ceil();
-    if (width == 0 || height == 0) {
+    if (grid.isEmpty || grid.first.isEmpty) {
       return MapMakerAssets._blankImage();
     }
+    final cols = grid.first.length;
+    final rows = grid.length;
+    final width = (cols * _tile).ceil();
+    final height = (rows * _tile).ceil();
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    for (var row = 0; row < level.rows; row++) {
-      for (var col = 0; col < level.cols; col++) {
+    for (var row = 0; row < rows; row++) {
+      for (var col = 0; col < cols; col++) {
         _paintCell(canvas, grid, assets, col, row);
       }
     }
@@ -150,6 +152,7 @@ abstract final class MapPreviewRenderer {
     return picture.toImage(width, height);
   }
 
+  /// Sol, pièce, spawn ou vide.
   static void _paintCell(
     Canvas canvas,
     List<String> grid,
@@ -160,13 +163,13 @@ abstract final class MapPreviewRenderer {
     final cell = grid[row][col];
     final dst = Rect.fromLTWH(col * _tile, row * _tile, _tile, _tile);
 
+    final tile = assets.tileSprite(cell);
+    if (tile != null) {
+      _paintTile(canvas, tile, dst);
+      return;
+    }
+
     switch (cell) {
-      case TileCodes.solid:
-        _paintTile(canvas, assets.bloc, dst);
-      case TileCodes.ice:
-        _paintTile(canvas, assets.ice, dst);
-      case TileCodes.mud:
-        _paintTile(canvas, assets.mud, dst);
       case TileCodes.coin:
         _paintCoin(canvas, assets, col, row);
       case TileCodes.player:
@@ -176,6 +179,7 @@ abstract final class MapPreviewRenderer {
     }
   }
 
+  /// Étire le PNG de tuile dans la case.
   static void _paintTile(Canvas canvas, ui.Image image, Rect dst) {
     _drawSprite(
       canvas,
@@ -188,7 +192,13 @@ abstract final class MapPreviewRenderer {
     );
   }
 
-  static void _paintCoin(Canvas canvas, MapMakerAssets assets, int col, int row) {
+  /// Pièce centrée dans la case.
+  static void _paintCoin(
+    Canvas canvas,
+    MapMakerAssets assets,
+    int col,
+    int row,
+  ) {
     final dst = Rect.fromCenter(
       center: Offset((col + 0.5) * _tile, (row + 0.5) * _tile),
       width: _tile,
@@ -197,7 +207,13 @@ abstract final class MapPreviewRenderer {
     _drawSprite(canvas, assets.coin, 0, 0, dst);
   }
 
-  static void _paintPlayer(Canvas canvas, MapMakerAssets assets, int col, int row) {
+  /// Pingouin recadré comme en jeu.
+  static void _paintPlayer(
+    Canvas canvas,
+    MapMakerAssets assets,
+    int col,
+    int row,
+  ) {
     const art = 16.0;
     const insetX = 8.0;
     const insetY = 16.0;
@@ -212,6 +228,7 @@ abstract final class MapPreviewRenderer {
     _drawSprite(canvas, assets.player, insetX, insetY, dst, art, art);
   }
 
+  /// Blit nearest-neighbor (pixel art net).
   static void _drawSprite(
     Canvas canvas,
     ui.Image image,
@@ -331,12 +348,14 @@ class _MapMakerPreviewGridState extends State<MapMakerPreviewGrid> {
   }
 
   GridPos _cellAt(Offset local) {
-    final col = (local.dx / MapMakerPreviewGrid.tileSize)
-        .floor()
-        .clamp(0, widget.cols - 1);
-    final row = (local.dy / MapMakerPreviewGrid.tileSize)
-        .floor()
-        .clamp(0, widget.rows - 1);
+    final col = (local.dx / MapMakerPreviewGrid.tileSize).floor().clamp(
+      0,
+      widget.cols - 1,
+    );
+    final row = (local.dy / MapMakerPreviewGrid.tileSize).floor().clamp(
+      0,
+      widget.rows - 1,
+    );
     return GridPos(col, row);
   }
 
@@ -394,10 +413,7 @@ class _MapMakerPreviewGridState extends State<MapMakerPreviewGrid> {
         fit: StackFit.expand,
         children: [
           CustomPaint(
-            painter: MapGridLinesPainter(
-              cols: widget.cols,
-              rows: widget.rows,
-            ),
+            painter: MapGridLinesPainter(cols: widget.cols, rows: widget.rows),
           ),
           if (_spriteLayer != null)
             RawImage(
@@ -427,21 +443,18 @@ class _MapMakerPreviewGridState extends State<MapMakerPreviewGrid> {
               _EagerPanGestureRecognizer:
                   GestureRecognizerFactoryWithHandlers<
                     _EagerPanGestureRecognizer
-                  >(
-                    _EagerPanGestureRecognizer.new,
-                    (recognizer) {
-                      recognizer.onStart = (details) {
-                        _beginDrag(details.localPosition);
-                      };
-                      recognizer.onUpdate = (details) {
-                        _updateDrag(details.localPosition);
-                      };
-                      recognizer.onEnd = (_) {
-                        _commitDrag();
-                      };
-                      recognizer.onCancel = _cancelDrag;
-                    },
-                  ),
+                  >(_EagerPanGestureRecognizer.new, (recognizer) {
+                    recognizer.onStart = (details) {
+                      _beginDrag(details.localPosition);
+                    };
+                    recognizer.onUpdate = (details) {
+                      _updateDrag(details.localPosition);
+                    };
+                    recognizer.onEnd = (_) {
+                      _commitDrag();
+                    };
+                    recognizer.onCancel = _cancelDrag;
+                  }),
             },
           ),
         ],

@@ -22,7 +22,7 @@ class GameScreen extends StatefulWidget {
   final List<LevelMap> levels;
   final int index;
 
-  /// Editor try-out: no personal bests, back returns to the caller.
+  /// Essai depuis l'éditeur : pas de PB, retour vers le caller.
   final bool playtest;
 
   @override
@@ -46,6 +46,7 @@ class _GameScreenState extends State<GameScreen> {
     _startLevel();
   }
 
+  /// Recrée input, HUD et instance Flame pour le niveau courant.
   void _startLevel() {
     final level = widget.levels[_index];
     _recordedWin = false;
@@ -62,6 +63,7 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
+  /// Charge le PB persisté pour l'overlay de victoire.
   Future<void> _loadLevelBest() async {
     final bests = await _bests.load();
     if (!mounted) {
@@ -72,6 +74,7 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
+  /// En playtest, mémorise le meilleur temps de la session éditeur.
   void _onHudChanged() {
     if (widget.playtest && _hud.won) {
       final time = _hud.elapsed;
@@ -82,6 +85,7 @@ class _GameScreenState extends State<GameScreen> {
     unawaited(_ensureRecorded());
   }
 
+  /// En campagne, écrit le PB une seule fois par victoire.
   Future<void> _ensureRecorded() async {
     if (widget.playtest || !_hud.won || _recordedWin) {
       return;
@@ -90,7 +94,7 @@ class _GameScreenState extends State<GameScreen> {
     final levelId = widget.levels[_index].id;
     final time = _hud.elapsed;
 
-    // Keep in-memory PB in sync immediately so retry + win overlay stay correct.
+    // PB mémoire tout de suite, pour retry + overlay.
     final stored = _storedBestAfterRun(_levelBest, time);
     if (stored != _levelBest && mounted) {
       setState(() => _levelBest = stored);
@@ -101,7 +105,7 @@ class _GameScreenState extends State<GameScreen> {
     await _bests.record(levelId, time);
   }
 
-  /// Mirrors [BestTimes.record] for the current level's stored time.
+  /// Même règle que [BestTimes.record] pour le temps affiché.
   double? _storedBestAfterRun(double? current, double runTime) {
     if (current == null || runTime < current) {
       return runTime;
@@ -109,6 +113,7 @@ class _GameScreenState extends State<GameScreen> {
     return current;
   }
 
+  /// Passe au niveau suivant (après avoir enregistré si besoin).
   Future<void> _rebuildAt(int index) async {
     await _ensureRecorded();
     _hud
@@ -128,6 +133,7 @@ class _GameScreenState extends State<GameScreen> {
     super.dispose();
   }
 
+  /// Pop : en playtest, renvoie le meilleur temps de l'essai.
   void _leave() {
     Navigator.of(context).pop(widget.playtest ? _playtestBest : null);
   }

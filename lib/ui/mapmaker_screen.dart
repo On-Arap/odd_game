@@ -8,7 +8,7 @@ import 'package:odd/game/palette.dart';
 import 'package:odd/ui/game_screen.dart';
 import 'package:odd/ui/mapmaker_preview.dart';
 
-/// Fills the inclusive rectangle from (col0, row0) to (col1, row1).
+/// Remplit le rectangle inclusif (col0,row0) → (col1,row1) avec [tile].
 List<String> paintGridRect(
   List<String> grid, {
   required int col0,
@@ -82,19 +82,19 @@ const mapMakerTiles = [
   MapMakerTile(
     code: TileCodes.solid,
     label: 'Solid',
-    color: Palette.snowFill,
+    color: Palette.solid,
     foreground: Palette.hud,
   ),
   MapMakerTile(
     code: TileCodes.ice,
     label: 'Ice',
-    color: Palette.iceA,
+    color: Palette.ice,
     foreground: Color(0xFF0E0F16),
   ),
   MapMakerTile(
     code: TileCodes.mud,
     label: 'Mud',
-    color: Palette.mudA,
+    color: Palette.mud,
     foreground: Palette.hud,
   ),
   MapMakerTile(
@@ -142,17 +142,19 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     super.initState();
     _assetsFuture = widget.assetsFuture ?? MapMakerAssets.load();
     _grid = _emptyGrid(_cols, _rows);
-    _assetsFuture.then((assets) {
-      if (!mounted) {
-        return;
-      }
-      setState(() => _assets = assets);
-    }).catchError((Object error) {
-      if (!mounted) {
-        return;
-      }
-      _showMessage('Could not load sprites: $error');
-    });
+    _assetsFuture
+        .then((assets) {
+          if (!mounted) {
+            return;
+          }
+          setState(() => _assets = assets);
+        })
+        .catchError((Object error) {
+          if (!mounted) {
+            return;
+          }
+          _showMessage('Could not load sprites: $error');
+        });
   }
 
   @override
@@ -164,17 +166,16 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     super.dispose();
   }
 
+  /// Grille remplie de `.`.
   List<String> _emptyGrid(int cols, int rows) {
     return List.generate(rows, (_) => TileCodes.empty * cols);
   }
 
+  /// Resize : copie le contenu existant, invalide le temps auteur.
   void _applySize() {
     final cols = int.tryParse(_widthController.text);
     final rows = int.tryParse(_heightController.text);
-    if (cols == null ||
-        rows == null ||
-        cols < _minSize ||
-        rows < _minSize) {
+    if (cols == null || rows == null || cols < _minSize || rows < _minSize) {
       _showMessage('Width and height must be positive numbers.');
       return;
     }
@@ -182,7 +183,9 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     final next = _emptyGrid(cols, rows);
     for (var row = 0; row < rows && row < _rows; row++) {
       final copyLen = cols < _cols ? cols : _cols;
-      next[row] = _grid[row].substring(0, copyLen).padRight(cols, TileCodes.empty);
+      next[row] = _grid[row]
+          .substring(0, copyLen)
+          .padRight(cols, TileCodes.empty);
     }
 
     setState(() {
@@ -193,6 +196,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     });
   }
 
+  /// Peint le pinceau sur un rectangle, puis reset le temps auteur.
   void _paintRect(int col0, int row0, int col1, int row1) {
     final next = paintGridRect(
       _grid,
@@ -211,6 +215,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     });
   }
 
+  /// JSON exporté (format 1, optionnellement author_time).
   String _buildJson() {
     final payload = <String, Object>{
       'format': 1,
@@ -228,10 +233,12 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     return encoder.convert(payload);
   }
 
+  /// Arrondi aux centièmes pour le JSON.
   static double _jsonAuthorTime(double seconds) {
     return (seconds * 100).round() / 100;
   }
 
+  /// Charge une map collée ; message d'erreur ou null.
   String? _loadFromJson(String source) {
     try {
       final decoded = jsonDecode(source.trim());
@@ -302,6 +309,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     }
   }
 
+  /// Caractère de grille connu.
   bool _isValidCell(String cell) {
     return cell == TileCodes.empty ||
         cell == TileCodes.solid ||
@@ -311,6 +319,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
         cell == TileCodes.coin;
   }
 
+  /// Lance le playtest ; un temps plus rapide valide Generate.
   Future<void> _play() async {
     try {
       final level = LevelMap.parseJson(_buildJson(), file: 'draft.json');
@@ -319,11 +328,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
       }
       final time = await Navigator.of(context).push<double?>(
         MaterialPageRoute<double?>(
-          builder: (_) => GameScreen(
-            levels: [level],
-            index: 0,
-            playtest: true,
-          ),
+          builder: (_) => GameScreen(levels: [level], index: 0, playtest: true),
         ),
       );
       if (!mounted || time == null) {
@@ -351,6 +356,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     }
   }
 
+  /// Copie le JSON (avec author_time) une fois la map validée en Play.
   Future<void> _generate() async {
     if (_authorTime == null) {
       _showMessage('Play and complete the map before generating.');
@@ -500,9 +506,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
                       ? 'Complete the map in Play to generate JSON.'
                       : 'Validated ${formatRunTime(_authorTime!)}',
                   style: TextStyle(
-                    color: _authorTime == null
-                        ? Palette.hudMuted
-                        : Palette.hud,
+                    color: _authorTime == null ? Palette.hudMuted : Palette.hud,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     fontFeatures: const [FontFeature.tabularFigures()],
@@ -685,10 +689,7 @@ class _ExportDialogState extends State<_ExportDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-              FilledButton(
-                onPressed: _export,
-                child: const Text('Export'),
-              ),
+              FilledButton(onPressed: _export, child: const Text('Export')),
             ],
           ),
         ),
