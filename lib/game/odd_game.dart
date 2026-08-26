@@ -44,6 +44,7 @@ class OddGame extends FlameGame with HasKeyboardHandlerComponents {
       'objects/coin_gold.png',
       'tilesets/bloc.png',
       'tilesets/ice.png',
+      'tilesets/mud.png',
     ]);
     camera.viewfinder.anchor = Anchor.center;
     add(KeyboardBridge(input, onRestart: queueRestart));
@@ -65,39 +66,23 @@ class OddGame extends FlameGame with HasKeyboardHandlerComponents {
     final tile = level.tileSize;
     final bloc = images.fromCache('tilesets/bloc.png');
     final ice = images.fromCache('tilesets/ice.png');
+    final mud = images.fromCache('tilesets/mud.png');
     for (var row = 0; row < level.rows; row++) {
       for (var col = 0; col < level.cols; col++) {
         final cell = level.tileAt(col, row);
         if (!TileCodes.isSolid(cell)) {
           continue;
         }
-        final at = Vector2(col * tile, row * tile);
-        final size = Vector2(tile, tile);
-        if (cell == TileCodes.ice) {
-          world.add(
-            GroundBlock.sprite(
-              position: at,
-              size: size,
-              sprite: Sprite(ice),
-            ),
-          );
-          continue;
-        }
-        if (cell == TileCodes.mud) {
-          world.add(
-            GroundBlock.color(
-              position: at,
-              size: size,
-              color: Palette.tile(cell, col, row),
-            ),
-          );
-          continue;
-        }
+        final sprite = Sprite(switch (cell) {
+          TileCodes.ice => ice,
+          TileCodes.mud => mud,
+          _ => bloc,
+        });
         world.add(
           GroundBlock.sprite(
-            position: at,
-            size: size,
-            sprite: Sprite(bloc),
+            position: Vector2(col * tile, row * tile),
+            size: Vector2(tile, tile),
+            sprite: sprite,
           ),
         );
       }

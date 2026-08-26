@@ -12,12 +12,14 @@ class MapMakerAssets {
   const MapMakerAssets({
     required this.bloc,
     required this.ice,
+    required this.mud,
     required this.coin,
     required this.player,
   });
 
   final ui.Image bloc;
   final ui.Image ice;
+  final ui.Image mud;
   final ui.Image coin;
   final ui.Image player;
 
@@ -25,14 +27,16 @@ class MapMakerAssets {
     final results = await Future.wait<ui.Image>([
       _loadImage('assets/sprites/tilesets/bloc.png'),
       _loadImage('assets/sprites/tilesets/ice.png'),
+      _loadImage('assets/sprites/tilesets/mud.png'),
       _loadImage('assets/sprites/objects/coin_gold.png'),
       _loadImage('assets/sprites/player/penguin.png'),
     ]);
     return MapMakerAssets(
       bloc: results[0],
       ice: results[1],
-      coin: results[2],
-      player: results[3],
+      mud: results[2],
+      coin: results[3],
+      player: results[4],
     );
   }
 
@@ -45,7 +49,13 @@ class MapMakerAssets {
 
   static Future<MapMakerAssets> placeholder() async {
     final image = await _blankImage();
-    return MapMakerAssets(bloc: image, ice: image, coin: image, player: image);
+    return MapMakerAssets(
+      bloc: image,
+      ice: image,
+      mud: image,
+      coin: image,
+      player: image,
+    );
   }
 
   static Future<ui.Image> _blankImage() async {
@@ -156,10 +166,7 @@ abstract final class MapPreviewRenderer {
       case TileCodes.ice:
         _paintTile(canvas, assets.ice, dst);
       case TileCodes.mud:
-        canvas.drawRect(
-          dst,
-          Paint()..color = Palette.tile(cell, col, row),
-        );
+        _paintTile(canvas, assets.mud, dst);
       case TileCodes.coin:
         _paintCoin(canvas, assets, col, row);
       case TileCodes.player:
