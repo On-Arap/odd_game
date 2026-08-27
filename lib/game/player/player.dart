@@ -43,6 +43,8 @@ class Player extends PositionComponent with HasGameReference {
   double _coyote = 0;
   double _wallCoyote = 0;
   bool _wasGrounded = false;
+  bool _doubleJumpAvailable = true;
+  bool _doubleJumping = false;
 
   /// Boîte de collision = taille du composant.
   Rect get hitbox {
@@ -72,7 +74,10 @@ class Player extends PositionComponent with HasGameReference {
     ];
     _sprite = SpriteAnimationComponent(
       animation: SpriteAnimation.spriteList(frames, stepTime: 0.12),
-      size: size.clone(),
+      size: Vector2(
+        GameConfig.playerSpriteWidth,
+        GameConfig.playerSpriteHeight,
+      ),
       anchor: Anchor.center,
       position: size / 2,
     );
@@ -101,14 +106,17 @@ class Player extends PositionComponent with HasGameReference {
     dt = dt.clamp(0, GameConfig.maxDt);
 
     velocity.y += GameConfig.gravity * dt;
-    // Relâcher le saut en montée raccourcit l'arc (short hop).
-    if (velocity.y < 0 && !input.jumpHeld) {
+    // Relâcher le saut en montée raccourcit l'arc (short hop), sauf double saut.
+    if (velocity.y < 0 && !input.jumpHeld && !_doubleJumping) {
       velocity.y +=
           GameConfig.gravity * (GameConfig.jumpReleaseGravity - 1) * dt;
     }
     // Plafond de vitesse de chute.
     if (velocity.y > GameConfig.maxFallSpeed) {
       velocity.y = GameConfig.maxFallSpeed;
+    }
+    if (_doubleJumping && velocity.y >= 0) {
+      _doubleJumping = false;
     }
 
     _separateFromSolids();
@@ -146,6 +154,8 @@ class Player extends PositionComponent with HasGameReference {
   void _updateCoyote(double dt) {
     if (_grounded) {
       _coyote = GameConfig.coyoteTime;
+      _doubleJumpAvailable = true;
+      _doubleJumping = false;
     } else if (_coyote > 0) {
       _coyote -= dt;
     }
@@ -189,7 +199,7 @@ class Player extends PositionComponent with HasGameReference {
     );
   }
 
-  /// Saut au sol (ou coyote) prioritaire, sinon wall-jump.
+  /// Saut au sol (ou coyote), wall-jump, puis double saut en l'air.
   void _tryJump() {
     final canGroundJump = _grounded || _coyote > 0;
     final canWallJump =
@@ -205,21 +215,29 @@ class Player extends PositionComponent with HasGameReference {
       scale.setValues(0.82, 1.22);
       return;
     }
-    if (!canWallJump) {
+    if (canWallJump) {
+      _facing = PlayerRules.facingAfterWallJump(
+        facing: _facing,
+        touchingLeft: _touchingLeft,
+        touchingRight: _touchingRight,
+        lastWall: _lastWall,
+      );
+      velocity
+        ..x = _facing * GameConfig.wallJumpX
+        ..y = GameConfig.wallJumpSpeed;
+      _wallCoyote = 0;
+      position.x += _facing * 2;
+      _separateFromSolids();
+      input.consumeJump();
+      scale.setValues(0.82, 1.22);
       return;
     }
-    _facing = PlayerRules.facingAfterWallJump(
-      facing: _facing,
-      touchingLeft: _touchingLeft,
-      touchingRight: _touchingRight,
-      lastWall: _lastWall,
-    );
-    velocity
-      ..x = _facing * GameConfig.wallJumpX
-      ..y = GameConfig.wallJumpSpeed;
-    _wallCoyote = 0;
-    position.x += _facing * 2;
-    _separateFromSolids();
+    if (!_doubleJumpAvailable) {
+      return;
+    }
+    velocity.y = GameConfig.doubleJumpSpeed;
+    _doubleJumpAvailable = false;
+    _doubleJumping = true;
     input.consumeJump();
     scale.setValues(0.82, 1.22);
   }

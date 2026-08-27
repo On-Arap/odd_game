@@ -4,16 +4,18 @@ abstract final class GameConfig {
 
   static const playerWidth = 32.0;
   static const playerHeight = 32.0;
+  static const playerSpriteWidth = 32.0;
+  static const playerSpriteHeight = 32.0;
 
-  static const gravity = 1350.0;
+  static const gravity = 1500.0;
   static const maxFallSpeed = 980.0;
-  static const runSpeed = 400.0;
+  static const runSpeed = 350.0;
   static const mudSpeed = 150.0;
   static const airMaxSpeed = 300.0;
 
   /// Time to reach [runSpeed] from rest. Acceleration is constant, so a
   /// running start takes less than this.
-  static const runAccelTime = 0.3;
+  static const runAccelTime = 0.5;
   static const runAccel = runSpeed / runAccelTime;
 
   /// Time to stop from [runSpeed]. Deceleration is constant, so a slower
@@ -23,14 +25,15 @@ abstract final class GameConfig {
 
   /// Time to reach [airMaxSpeed] from rest while airborne with run held.
   /// Lower = more aerial drift control.
-  static const airAccelTime = 0.45;
+  static const airAccelTime = 0.5;
   static const airAccel = airMaxSpeed / airAccelTime;
 
   /// Time to stop from [airMaxSpeed] in air when run is released.
   /// Higher = more glide / easier to feather.
-  static const airDecelTime = 0.2;
+  static const airDecelTime = 0.5;
   static const airDecel = airMaxSpeed / airDecelTime;
   static const jumpSpeed = -540.0;
+  static const doubleJumpSpeed = -500.0;
   static const wallJumpSpeed = -500.0;
   static const wallJumpX = 240.0;
 

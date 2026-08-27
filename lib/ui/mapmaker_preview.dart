@@ -222,8 +222,8 @@ abstract final class MapPreviewRenderer {
         (col + 0.5) * _tile,
         (row + 1) * _tile - GameConfig.playerHeight / 2,
       ),
-      width: GameConfig.playerWidth,
-      height: GameConfig.playerHeight,
+      width: GameConfig.playerSpriteWidth,
+      height: GameConfig.playerSpriteHeight,
     );
     _drawSprite(canvas, assets.player, insetX, insetY, dst, art, art);
   }

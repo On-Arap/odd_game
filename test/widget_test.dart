@@ -28,6 +28,8 @@ void main() {
     expect(find.text('Jump Jump'), findsOneWidget);
     expect(find.text('Wall Jump'), findsOneWidget);
     expect(find.text('The Shaft'), findsOneWidget);
+    expect(find.text('Rome'), findsOneWidget);
+    expect(find.text('New Map'), findsNothing);
   });
 
   test('mapmaker route is web-only', () {
@@ -117,7 +119,10 @@ void main() {
     await tester.tap(find.text('Play'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('needs exactly one player spawn'), findsOneWidget);
+    expect(
+      find.textContaining('needs exactly one player spawn'),
+      findsOneWidget,
+    );
     expect(find.text('Map Maker'), findsOneWidget);
     expect(find.byType(GameScreen), findsNothing);
   });

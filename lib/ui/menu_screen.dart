@@ -19,6 +19,7 @@ class MenuScreen extends StatefulWidget {
 
 class _MenuScreenState extends State<MenuScreen> {
   List<LevelMap>? _levels;
+  LevelMap? _daily;
   Object? _error;
   BestTimes _bests = const BestTimes({});
 
@@ -28,16 +29,19 @@ class _MenuScreenState extends State<MenuScreen> {
     _load();
   }
 
-  /// Charge les maps bundle + les PB.
+  /// Charge les maps bundle, la daily map, et les PB.
   Future<void> _load() async {
     try {
-      final levels = await LevelRepository().loadAll();
+      final repo = LevelRepository();
+      final levels = await repo.loadAll();
+      final daily = await repo.loadDaily();
       final bests = await BestTimesStore().load();
       if (!mounted) {
         return;
       }
       setState(() {
         _levels = levels;
+        _daily = daily;
         _bests = bests;
         _error = null;
       });
@@ -53,10 +57,7 @@ class _MenuScreenState extends State<MenuScreen> {
   Future<void> _openLevel(List<LevelMap> levels, int index) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => GameScreen(
-          levels: levels,
-          index: index,
-        ),
+        builder: (_) => GameScreen(levels: levels, index: index),
       ),
     );
     if (!mounted) {
@@ -69,13 +70,13 @@ class _MenuScreenState extends State<MenuScreen> {
     setState(() => _bests = bests);
   }
 
+  Future<void> _openDaily(LevelMap daily) async {
+    await _openLevel([daily], 0);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: _body(),
-      ),
-    );
+    return Scaffold(body: SafeArea(child: _body()));
   }
 
   Widget _body() {
@@ -91,48 +92,96 @@ class _MenuScreenState extends State<MenuScreen> {
       );
     }
     final levels = _levels;
-    if (levels == null) {
+    final daily = _daily;
+    if (levels == null || daily == null) {
       return const Center(child: CircularProgressIndicator());
     }
     final total = _bests.totalFor(levels.map((level) => level.id));
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            flex: 5,
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 32, 20, 0),
-                child: _Brand(total: total),
-              ),
-            ),
-          ),
-          const SizedBox(width: 28),
-          Expanded(
-            flex: 7,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 24, bottom: 8),
-              child: Column(
-                children: [
-                  for (var index = 0; index < levels.length; index++) ...[
-                    if (index > 0) const SizedBox(height: 8),
-                    Expanded(
-                      child: _LevelTile(
-                        index: index,
-                        level: levels[index],
-                        best: _bests.forLevel(levels[index].id),
-                        onTap: () => _openLevel(levels, index),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const tileGap = 8.0;
+          const listTop = 24.0;
+          const listBottom = 8.0;
+          final listHeight = constraints.maxHeight - listTop - listBottom;
+          final tileHeight =
+              (listHeight - (levels.length - 1) * tileGap) / levels.length;
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 1,
+                child: LayoutBuilder(
+                  builder: (context, leftBox) {
+                    const leftInset = 12.0;
+                    const dailyExtraWidth = 40.0;
+                    final dailyTileWidth =
+                        leftBox.maxWidth - leftInset + dailyExtraWidth;
+
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        leftInset,
+                        32,
+                        0,
+                        listBottom,
                       ),
-                    ),
-                  ],
-                ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _Brand(total: total),
+                          const Spacer(),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: SizedBox(
+                              width: dailyTileWidth,
+                              height: tileHeight,
+                              child: _LevelTile(
+                                level: daily,
+                                backgroundLabel: 'DailyMap',
+                                title: daily.name,
+                                best: _bests.forLevel(daily.id),
+                                onTap: () => _openDaily(daily),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: tileHeight + tileGap),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-          ),
-        ],
+              const SizedBox(width: 28),
+              Expanded(
+                flex: 1,
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    top: listTop,
+                    bottom: listBottom,
+                  ),
+                  child: Column(
+                    children: [
+                      for (var index = 0; index < levels.length; index++) ...[
+                        if (index > 0) const SizedBox(height: tileGap),
+                        SizedBox(
+                          height: tileHeight,
+                          child: _LevelTile(
+                            index: index,
+                            level: levels[index],
+                            best: _bests.forLevel(levels[index].id),
+                            onTap: () => _openLevel(levels, index),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -266,23 +315,38 @@ class _PenguinPainter extends CustomPainter {
 
 class _LevelTile extends StatelessWidget {
   const _LevelTile({
-    required this.index,
     required this.level,
     required this.best,
     required this.onTap,
+    this.index,
+    this.backgroundLabel,
+    this.title,
   });
 
-  final int index;
+  final int? index;
+  final String? backgroundLabel;
   final LevelMap level;
+  final String? title;
   final double? best;
   final VoidCallback onTap;
 
   bool get _beatAuthor =>
       best != null && level.authorTime != null && best! <= level.authorTime!;
 
+  String? get _background {
+    if (backgroundLabel != null) {
+      return backgroundLabel;
+    }
+    if (index == null) {
+      return null;
+    }
+    return (index! + 1).toString().padLeft(2, '0');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final number = (index + 1).toString().padLeft(2, '0');
+    final background = _background;
+    final label = title ?? level.name;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -299,24 +363,25 @@ class _LevelTile extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Positioned.fill(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: FittedBox(
-                      fit: BoxFit.fitHeight,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        number,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          height: 1,
-                          letterSpacing: -2,
-                          color: Color(0xFF3A3D4A),
+                if (background != null)
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: FittedBox(
+                        fit: BoxFit.fitHeight,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          background,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            height: 1,
+                            letterSpacing: -2,
+                            color: Color(0xFF3A3D4A),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
                 Positioned.fill(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(18, 4, 10, 4),
@@ -325,7 +390,7 @@ class _LevelTile extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            level.name,
+                            label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -360,10 +425,10 @@ class _LevelTile extends StatelessWidget {
                 ),
               ],
             ),
-            ),
           ),
         ),
-      );
+      ),
+    );
   }
 }
 
