@@ -483,17 +483,28 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
                   border: Border.all(color: Palette.hudMuted),
                   color: Palette.background,
                 ),
-                child: _ScrollablePreview(
-                  child: MapMakerPreviewGrid(
-                    cols: _cols,
-                    rows: _rows,
-                    grid: _grid,
-                    assets: _assets,
-                    brushColor: mapMakerTiles
-                        .firstWhere((tile) => tile.code == _selected)
-                        .color,
-                    onPaintRect: _paintRect,
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final tileSize = MapMakerPreviewGrid.fittedTileSize(
+                      maxWidth: constraints.maxWidth,
+                      maxHeight: constraints.maxHeight,
+                      cols: _cols,
+                      rows: _rows,
+                    );
+                    return Center(
+                      child: MapMakerPreviewGrid(
+                        cols: _cols,
+                        rows: _rows,
+                        grid: _grid,
+                        assets: _assets,
+                        tileSize: tileSize,
+                        brushColor: mapMakerTiles
+                            .firstWhere((tile) => tile.code == _selected)
+                            .color,
+                        onPaintRect: _paintRect,
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -593,49 +604,6 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
       onPressed: onPressed,
       style: style,
       child: Text(label),
-    );
-  }
-}
-
-class _ScrollablePreview extends StatefulWidget {
-  const _ScrollablePreview({required this.child});
-
-  final Widget child;
-
-  @override
-  State<_ScrollablePreview> createState() => _ScrollablePreviewState();
-}
-
-class _ScrollablePreviewState extends State<_ScrollablePreview> {
-  final _vertical = ScrollController();
-  final _horizontal = ScrollController();
-
-  @override
-  void dispose() {
-    _vertical.dispose();
-    _horizontal.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scrollbar(
-      controller: _vertical,
-      thumbVisibility: true,
-      child: SingleChildScrollView(
-        controller: _vertical,
-        scrollDirection: Axis.vertical,
-        child: Scrollbar(
-          controller: _horizontal,
-          thumbVisibility: true,
-          notificationPredicate: (notification) => notification.depth == 1,
-          child: SingleChildScrollView(
-            controller: _horizontal,
-            scrollDirection: Axis.horizontal,
-            child: widget.child,
-          ),
-        ),
-      ),
     );
   }
 }

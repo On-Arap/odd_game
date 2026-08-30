@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:odd/ui/mapmaker_preview.dart';
 import 'package:odd/ui/mapmaker_screen.dart';
 
 void main() {
@@ -43,6 +44,36 @@ void main() {
         '.C.',
         '...',
       ],
+    );
+  });
+
+  test('fittedTileSize shrinks when the map exceeds the viewport', () {
+    expect(
+      MapMakerPreviewGrid.fittedTileSize(
+        maxWidth: 512,
+        maxHeight: 288,
+        cols: 32,
+        rows: 18,
+      ),
+      MapMakerPreviewGrid.defaultTileSize,
+    );
+    expect(
+      MapMakerPreviewGrid.fittedTileSize(
+        maxWidth: 160,
+        maxHeight: 180,
+        cols: 32,
+        rows: 18,
+      ),
+      5,
+    );
+    expect(
+      MapMakerPreviewGrid.fittedTileSize(
+        maxWidth: 320,
+        maxHeight: 90,
+        cols: 32,
+        rows: 18,
+      ),
+      5,
     );
   });
 }

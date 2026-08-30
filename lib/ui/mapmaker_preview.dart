@@ -80,12 +80,15 @@ class MapMakerAssets {
 
 /// Fast grid lines + checker so the editor is usable before sprites finish.
 class MapGridLinesPainter extends CustomPainter {
-  MapGridLinesPainter({required this.cols, required this.rows});
+  MapGridLinesPainter({
+    required this.cols,
+    required this.rows,
+    required this.tileSize,
+  });
 
   final int cols;
   final int rows;
-
-  static const _tile = MapMakerPreviewGrid.tileSize;
+  final double tileSize;
 
   /// Damier + lignes de grille.
   @override
@@ -99,7 +102,7 @@ class MapGridLinesPainter extends CustomPainter {
           continue;
         }
         canvas.drawRect(
-          Rect.fromLTWH(col * _tile, row * _tile, _tile, _tile),
+          Rect.fromLTWH(col * tileSize, row * tileSize, tileSize, tileSize),
           checker,
         );
       }
@@ -109,23 +112,25 @@ class MapGridLinesPainter extends CustomPainter {
       ..color = const Color(0x44FFFFFF)
       ..strokeWidth = 1;
     for (var col = 0; col <= cols; col++) {
-      final x = col * _tile + 0.5;
-      canvas.drawLine(Offset(x, 0), Offset(x, rows * _tile), line);
+      final x = col * tileSize + 0.5;
+      canvas.drawLine(Offset(x, 0), Offset(x, rows * tileSize), line);
     }
     for (var row = 0; row <= rows; row++) {
-      final y = row * _tile + 0.5;
-      canvas.drawLine(Offset(0, y), Offset(cols * _tile, y), line);
+      final y = row * tileSize + 0.5;
+      canvas.drawLine(Offset(0, y), Offset(cols * tileSize, y), line);
     }
   }
 
   @override
   bool shouldRepaint(covariant MapGridLinesPainter oldDelegate) {
-    return oldDelegate.cols != cols || oldDelegate.rows != rows;
+    return oldDelegate.cols != cols ||
+        oldDelegate.rows != rows ||
+        oldDelegate.tileSize != tileSize;
   }
 }
 
 abstract final class MapPreviewRenderer {
-  static const _tile = MapMakerPreviewGrid.tileSize;
+  static const _tile = MapMakerPreviewGrid.defaultTileSize;
 
   /// Dessine toute la grille dans une image (tuiles, pièces, spawn).
   static Future<ui.Image> rasterize({
@@ -256,6 +261,7 @@ class MapMakerPreviewGrid extends StatefulWidget {
     required this.onPaintRect,
     required this.brushColor,
     this.assets,
+    this.tileSize = defaultTileSize,
   });
 
   final int cols;
@@ -263,9 +269,32 @@ class MapMakerPreviewGrid extends StatefulWidget {
   final List<String> grid;
   final MapMakerAssets? assets;
   final Color brushColor;
+  final double tileSize;
   final void Function(int col0, int row0, int col1, int row1) onPaintRect;
 
-  static const tileSize = 16.0;
+  static const defaultTileSize = 16.0;
+
+  /// Shrinks tiles so [cols]×[rows] fits in [maxWidth]×[maxHeight].
+  static double fittedTileSize({
+    required double maxWidth,
+    required double maxHeight,
+    required int cols,
+    required int rows,
+  }) {
+    if (cols <= 0 || rows <= 0) {
+      return defaultTileSize;
+    }
+    final byWidth = maxWidth.isFinite ? maxWidth / cols : defaultTileSize;
+    final byHeight = maxHeight.isFinite ? maxHeight / rows : defaultTileSize;
+    final fitted = byWidth < byHeight ? byWidth : byHeight;
+    if (fitted >= defaultTileSize) {
+      return defaultTileSize;
+    }
+    if (fitted < 1) {
+      return 1;
+    }
+    return fitted;
+  }
 
   @override
   State<MapMakerPreviewGrid> createState() => _MapMakerPreviewGridState();
@@ -348,14 +377,8 @@ class _MapMakerPreviewGridState extends State<MapMakerPreviewGrid> {
   }
 
   GridPos _cellAt(Offset local) {
-    final col = (local.dx / MapMakerPreviewGrid.tileSize).floor().clamp(
-      0,
-      widget.cols - 1,
-    );
-    final row = (local.dy / MapMakerPreviewGrid.tileSize).floor().clamp(
-      0,
-      widget.rows - 1,
-    );
+    final col = (local.dx / widget.tileSize).floor().clamp(0, widget.cols - 1);
+    final row = (local.dy / widget.tileSize).floor().clamp(0, widget.rows - 1);
     return GridPos(col, row);
   }
 
@@ -403,8 +426,8 @@ class _MapMakerPreviewGridState extends State<MapMakerPreviewGrid> {
 
   @override
   Widget build(BuildContext context) {
-    final width = widget.cols * MapMakerPreviewGrid.tileSize;
-    final height = widget.rows * MapMakerPreviewGrid.tileSize;
+    final width = widget.cols * widget.tileSize;
+    final height = widget.rows * widget.tileSize;
 
     return SizedBox(
       width: width,
@@ -413,7 +436,11 @@ class _MapMakerPreviewGridState extends State<MapMakerPreviewGrid> {
         fit: StackFit.expand,
         children: [
           CustomPaint(
-            painter: MapGridLinesPainter(cols: widget.cols, rows: widget.rows),
+            painter: MapGridLinesPainter(
+              cols: widget.cols,
+              rows: widget.rows,
+              tileSize: widget.tileSize,
+            ),
           ),
           if (_spriteLayer != null)
             RawImage(
@@ -435,6 +462,7 @@ class _MapMakerPreviewGridState extends State<MapMakerPreviewGrid> {
                 start: _dragStart!,
                 end: _dragEnd!,
                 color: widget.brushColor,
+                tileSize: widget.tileSize,
               ),
             ),
           RawGestureDetector(
@@ -468,20 +496,20 @@ class _RectPreviewPainter extends CustomPainter {
     required this.start,
     required this.end,
     required this.color,
+    required this.tileSize,
   });
 
   final GridPos start;
   final GridPos end;
   final Color color;
-
-  static const _tile = MapMakerPreviewGrid.tileSize;
+  final double tileSize;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final left = (start.col < end.col ? start.col : end.col) * _tile;
-    final right = ((start.col < end.col ? end.col : start.col) + 1) * _tile;
-    final top = (start.row < end.row ? start.row : end.row) * _tile;
-    final bottom = ((start.row < end.row ? end.row : start.row) + 1) * _tile;
+    final left = (start.col < end.col ? start.col : end.col) * tileSize;
+    final right = ((start.col < end.col ? end.col : start.col) + 1) * tileSize;
+    final top = (start.row < end.row ? start.row : end.row) * tileSize;
+    final bottom = ((start.row < end.row ? end.row : start.row) + 1) * tileSize;
     final rect = Rect.fromLTRB(left, top, right, bottom);
     canvas.drawRect(rect, Paint()..color = color.withValues(alpha: 0.45));
     canvas.drawRect(
@@ -497,12 +525,12 @@ class _RectPreviewPainter extends CustomPainter {
   bool shouldRepaint(covariant _RectPreviewPainter oldDelegate) {
     return oldDelegate.start != start ||
         oldDelegate.end != end ||
-        oldDelegate.color != color;
+        oldDelegate.color != color ||
+        oldDelegate.tileSize != tileSize;
   }
 }
 
-/// Wins the arena immediately so map drags paint a rectangle instead of
-/// scrolling the preview.
+/// Wins the arena immediately so map drags paint a rectangle.
 class _EagerPanGestureRecognizer extends PanGestureRecognizer {
   @override
   void addAllowedPointer(PointerDownEvent event) {
