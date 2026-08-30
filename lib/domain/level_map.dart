@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:odd/app_string.dart';
+
 /// Grid characters the upcoming web editor should emit.
 abstract final class TileCodes {
   static const empty = '.';
@@ -60,6 +62,9 @@ class LevelMap {
     required this.spawn,
     required this.coins,
     this.authorTime,
+    this.bronzeTime,
+    this.silverTime,
+    this.goldTime,
   });
 
   final int format;
@@ -71,6 +76,9 @@ class LevelMap {
   final GridPos spawn;
   final List<GridPos> coins;
   final double? authorTime;
+  final double? bronzeTime;
+  final double? silverTime;
+  final double? goldTime;
 
   int get cols => grid.first.length;
   int get rows => grid.length;
@@ -107,7 +115,7 @@ class LevelMap {
   }) {
     final decoded = jsonDecode(source);
     if (decoded is! Map<String, dynamic>) {
-      throw FormatException('Level $file must be a JSON object.');
+      throw FormatException(AppString.levelNotJsonObject(file));
     }
     return LevelMap.fromJson(decoded, file: file);
   }
@@ -120,7 +128,7 @@ class LevelMap {
     final format = json['format'];
     if (format != 1) {
       throw FormatException(
-        'Level $file has unsupported format "$format". Expected 1.',
+        AppString.levelUnsupportedFormat(file, format),
       );
     }
 
@@ -129,40 +137,54 @@ class LevelMap {
     final tileSize = json['tileSize'];
     final gridRaw = json['grid'];
     final authorTimeRaw = json['author_time'];
+    final bronzeTimeRaw = json['bronze_time'];
+    final silverTimeRaw = json['silver_time'];
+    final goldTimeRaw = json['gold_time'];
 
     if (id is! String || id.isEmpty) {
-      throw FormatException('Level $file is missing a string "id".');
+      throw FormatException(AppString.levelMissingId(file));
     }
     if (name is! String || name.isEmpty) {
-      throw FormatException('Level $file is missing a string "name".');
+      throw FormatException(AppString.levelMissingName(file));
     }
     if (tileSize is! num || tileSize <= 0) {
-      throw FormatException('Level $file is missing a positive "tileSize".');
+      throw FormatException(AppString.levelMissingTileSize(file));
     }
     if (gridRaw is! List || gridRaw.isEmpty) {
-      throw FormatException('Level $file is missing a non-empty "grid".');
+      throw FormatException(AppString.levelMissingGrid(file));
     }
     if (authorTimeRaw != null &&
         (authorTimeRaw is! num || authorTimeRaw < 0)) {
-      throw FormatException('Level $file has an invalid "author_time".');
+      throw FormatException(AppString.levelInvalidAuthorTime(file));
+    }
+    if (bronzeTimeRaw != null &&
+        (bronzeTimeRaw is! num || bronzeTimeRaw < 0)) {
+      throw FormatException(AppString.levelInvalidBronzeTime(file));
+    }
+    if (silverTimeRaw != null &&
+        (silverTimeRaw is! num || silverTimeRaw < 0)) {
+      throw FormatException(AppString.levelInvalidSilverTime(file));
+    }
+    if (goldTimeRaw != null && (goldTimeRaw is! num || goldTimeRaw < 0)) {
+      throw FormatException(AppString.levelInvalidGoldTime(file));
     }
 
     final grid = gridRaw.map((row) {
       if (row is! String) {
-        throw FormatException('Level $file grid rows must be strings.');
+        throw FormatException(AppString.levelGridRowsMustBeStrings(file));
       }
       return row;
     }).toList();
 
     final cols = grid.first.length;
     if (cols == 0) {
-      throw FormatException('Level $file has an empty first grid row.');
+      throw FormatException(AppString.levelEmptyFirstRow(file));
     }
     // Toutes les lignes doivent avoir la même largeur.
     for (var r = 0; r < grid.length; r++) {
       if (grid[r].length != cols) {
         throw FormatException(
-          'Level $file row $r is ${grid[r].length} wide, expected $cols.',
+          AppString.levelUnevenRow(file, r, grid[r].length, cols),
         );
       }
     }
@@ -183,7 +205,7 @@ class LevelMap {
           case TileCodes.player:
             if (spawn != null) {
               throw FormatException(
-                'Level $file has more than one player spawn (P).',
+                AppString.levelMultipleSpawns(file),
               );
             }
             spawn = GridPos(col, row);
@@ -191,18 +213,17 @@ class LevelMap {
             coins.add(GridPos(col, row));
           default:
             throw FormatException(
-              'Level $file has unknown tile "$cell" at ($col, $row). '
-              'Use . # I M P C',
+              AppString.levelUnknownTile(file, cell, col, row),
             );
         }
       }
     }
 
     if (spawn == null) {
-      throw FormatException('Level $file needs exactly one player spawn (P).');
+      throw FormatException(AppString.levelNeedsSpawn(file));
     }
     if (coins.isEmpty) {
-      throw FormatException('Level $file needs at least one coin (C).');
+      throw FormatException(AppString.levelNeedsCoin(file));
     }
 
     return LevelMap(
@@ -217,6 +238,15 @@ class LevelMap {
       authorTime: authorTimeRaw == null
           ? null
           : (authorTimeRaw as num).toDouble(),
+      bronzeTime: bronzeTimeRaw == null
+          ? null
+          : (bronzeTimeRaw as num).toDouble(),
+      silverTime: silverTimeRaw == null
+          ? null
+          : (silverTimeRaw as num).toDouble(),
+      goldTime: goldTimeRaw == null
+          ? null
+          : (goldTimeRaw as num).toDouble(),
     );
   }
 }

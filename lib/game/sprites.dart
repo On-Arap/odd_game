@@ -6,6 +6,10 @@ abstract final class GameSprites {
 
   static const player = 'player/penguin.png';
   static const coin = 'objects/coin_gold.png';
+  static const medalGold = 'objects/medal_gold.png';
+  static const medalSilver = 'objects/medal_silver.png';
+  static const medalCopper = 'objects/medal_copper.png';
+  static const authorGem = 'objects/author_gem.png';
   static const bloc = 'tilesets/bloc.png';
   static const ice = 'tilesets/ice.png';
   static const mud = 'tilesets/mud.png';

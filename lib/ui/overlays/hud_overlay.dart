@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:odd/app_string.dart';
 import 'package:odd/game/hud_state.dart';
 import 'package:odd/game/palette.dart';
 
 class HudOverlay extends StatelessWidget {
-  const HudOverlay({
+  HudOverlay({
     super.key,
     required this.hud,
     required this.onBack,
     required this.onRestart,
-    this.backLabel = 'MENU',
-  });
+    String? backLabel,
+  }) : backLabel = backLabel ?? AppString.menu;
 
   final HudState hud;
   final VoidCallback onBack;
@@ -33,7 +34,7 @@ class HudOverlay extends StatelessWidget {
                     children: [
                       _HudButton(label: backLabel, onTap: onBack),
                       const SizedBox(width: 8),
-                      _HudButton(label: 'RETRY', onTap: onRestart),
+                      _HudButton(label: AppString.retry, onTap: onRestart),
                     ],
                   ),
                 ),

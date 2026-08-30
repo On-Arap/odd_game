@@ -2,13 +2,19 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:odd/app_string.dart';
 import 'package:odd/data/best_times_store.dart';
 import 'package:odd/data/level_repository.dart';
+import 'package:odd/data/tutorial_store.dart';
+import 'package:odd/ui/tutorial.dart';
 import 'package:odd/domain/best_times.dart';
 import 'package:odd/domain/level_map.dart';
+import 'package:odd/domain/medals.dart';
 import 'package:odd/game/hud_state.dart';
 import 'package:odd/game/palette.dart';
+import 'package:odd/game/sprites.dart';
 import 'package:odd/ui/game_screen.dart';
+import 'package:odd/ui/sprite_sheet_animation.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -22,6 +28,7 @@ class _MenuScreenState extends State<MenuScreen> {
   LevelMap? _daily;
   Object? _error;
   BestTimes _bests = const BestTimes({});
+  int _tutorialLvl = 0;
 
   @override
   void initState() {
@@ -36,6 +43,7 @@ class _MenuScreenState extends State<MenuScreen> {
       final levels = await repo.loadAll();
       final daily = await repo.loadDaily();
       final bests = await BestTimesStore().load();
+      final tutorialLvl = await TutorialStore().load();
       if (!mounted) {
         return;
       }
@@ -43,6 +51,7 @@ class _MenuScreenState extends State<MenuScreen> {
         _levels = levels;
         _daily = daily;
         _bests = bests;
+        _tutorialLvl = tutorialLvl;
         _error = null;
       });
     } catch (error) {
@@ -53,24 +62,52 @@ class _MenuScreenState extends State<MenuScreen> {
     }
   }
 
+  bool get _tutorialLocksMaps => Tutorial.locksMaps(_tutorialLvl);
+
   /// Ouvre le niveau puis rafraîchit les temps au retour.
-  Future<void> _openLevel(List<LevelMap> levels, int index) async {
+  Future<void> _openLevel(
+    List<LevelMap> levels,
+    int index, {
+    bool showRunTutorial = false,
+  }) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => GameScreen(levels: levels, index: index),
+        builder: (_) => GameScreen(
+          levels: levels,
+          index: index,
+          showRunTutorial: showRunTutorial,
+        ),
       ),
     );
     if (!mounted) {
       return;
     }
     final bests = await BestTimesStore().load();
+    final tutorialLvl = await TutorialStore().load();
     if (!mounted) {
       return;
     }
-    setState(() => _bests = bests);
+    setState(() {
+      _bests = bests;
+      _tutorialLvl = tutorialLvl;
+    });
+  }
+
+  Future<void> _openCampaign(List<LevelMap> levels, int index) async {
+    if (_tutorialLocksMaps) {
+      if (index != 0) {
+        return;
+      }
+      await _openLevel([levels.first], 0, showRunTutorial: true);
+      return;
+    }
+    await _openLevel(levels, index);
   }
 
   Future<void> _openDaily(LevelMap daily) async {
+    if (_tutorialLocksMaps) {
+      return;
+    }
     await _openLevel([daily], 0);
   }
 
@@ -85,7 +122,7 @@ class _MenuScreenState extends State<MenuScreen> {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            'Could not load maps.\n$_error',
+            AppString.mapsLoadError(_error!),
             textAlign: TextAlign.center,
           ),
         ),
@@ -105,8 +142,9 @@ class _MenuScreenState extends State<MenuScreen> {
           const listTop = 24.0;
           const listBottom = 8.0;
           final listHeight = constraints.maxHeight - listTop - listBottom;
-          final tileHeight =
+          final filledTileHeight =
               (listHeight - (levels.length - 1) * tileGap) / levels.length;
+          final tileHeight = filledTileHeight.clamp(56.0, 80.0);
 
           return Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -139,14 +177,15 @@ class _MenuScreenState extends State<MenuScreen> {
                               height: tileHeight,
                               child: _LevelTile(
                                 level: daily,
-                                backgroundLabel: 'DailyMap',
+                                backgroundLabel: AppString.dailyMap,
                                 title: daily.name,
                                 best: _bests.forLevel(daily.id),
+                                locked: _tutorialLocksMaps,
                                 onTap: () => _openDaily(daily),
                               ),
                             ),
                           ),
-                          SizedBox(height: tileHeight + tileGap),
+                          const SizedBox(height: tileGap),
                         ],
                       ),
                     );
@@ -161,21 +200,24 @@ class _MenuScreenState extends State<MenuScreen> {
                     top: listTop,
                     bottom: listBottom,
                   ),
-                  child: Column(
-                    children: [
-                      for (var index = 0; index < levels.length; index++) ...[
-                        if (index > 0) const SizedBox(height: tileGap),
-                        SizedBox(
-                          height: tileHeight,
-                          child: _LevelTile(
-                            index: index,
-                            level: levels[index],
-                            best: _bests.forLevel(levels[index].id),
-                            onTap: () => _openLevel(levels, index),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        for (var index = 0; index < levels.length; index++) ...[
+                          if (index > 0) const SizedBox(height: tileGap),
+                          SizedBox(
+                            height: tileHeight,
+                            child: _LevelTile(
+                              index: index,
+                              level: levels[index],
+                              best: _bests.forLevel(levels[index].id),
+                              locked: _tutorialLocksMaps && index > 0,
+                              onTap: () => _openCampaign(levels, index),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -205,8 +247,8 @@ class _Brand extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text(
-                'ODD',
+              Text(
+                AppString.appTitle,
                 style: TextStyle(
                   fontSize: 64,
                   fontWeight: FontWeight.w800,
@@ -224,14 +266,14 @@ class _Brand extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        const Text(
-          'Grab every coin. Fastest time wins.',
+        Text(
+          AppString.menuTagline,
           style: TextStyle(color: Palette.hudMuted, fontSize: 15),
         ),
         if (total != null) ...[
           const SizedBox(height: 14),
           Text(
-            'Total ${formatRunTime(total!)}',
+            AppString.totalTime(formatRunTime(total!)),
             style: const TextStyle(
               color: Palette.hud,
               fontSize: 22,
@@ -321,6 +363,7 @@ class _LevelTile extends StatelessWidget {
     this.index,
     this.backgroundLabel,
     this.title,
+    this.locked = false,
   });
 
   final int? index;
@@ -328,10 +371,8 @@ class _LevelTile extends StatelessWidget {
   final LevelMap level;
   final String? title;
   final double? best;
+  final bool locked;
   final VoidCallback onTap;
-
-  bool get _beatAuthor =>
-      best != null && level.authorTime != null && best! <= level.authorTime!;
 
   String? get _background {
     if (backgroundLabel != null) {
@@ -350,7 +391,7 @@ class _LevelTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: locked ? null : onTap,
         borderRadius: BorderRadius.circular(12),
         child: Ink(
           decoration: BoxDecoration(
@@ -382,21 +423,33 @@ class _LevelTile extends StatelessWidget {
                       ),
                     ),
                   ),
+                if (locked)
+                  const Positioned.fill(
+                    child: ColoredBox(color: Color(0xAA0A0B10)),
+                  ),
                 Positioned.fill(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(18, 4, 10, 4),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
+                        if (locked) ...[
+                          const Icon(
+                            Icons.lock_outline,
+                            size: 18,
+                            color: Palette.hudMuted,
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         Expanded(
                           child: Text(
                             label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
-                              color: Palette.hud,
+                              color: locked ? Palette.hudMuted : Palette.hud,
                               height: 1.1,
                             ),
                           ),
@@ -407,14 +460,8 @@ class _LevelTile extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (_beatAuthor) ...[
-                                const Icon(
-                                  Icons.emoji_events,
-                                  size: 18,
-                                  color: Palette.coin,
-                                ),
-                                const SizedBox(width: 8),
-                              ],
+                              _TileAwards(level: level, best: best),
+                              const SizedBox(width: 8),
                               _TimeChip(best: best),
                             ],
                           ),
@@ -427,6 +474,95 @@ class _LevelTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _TileAwards extends StatelessWidget {
+  const _TileAwards({required this.level, required this.best});
+
+  final LevelMap level;
+  final double? best;
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 20.0;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _AwardSlot(
+          size: size,
+          filled: medalEarned(best, level.bronzeTime),
+          asset: GameSprites.bundle(GameSprites.medalCopper),
+        ),
+        const SizedBox(width: 4),
+        _AwardSlot(
+          size: size,
+          filled: medalEarned(best, level.silverTime),
+          asset: GameSprites.bundle(GameSprites.medalSilver),
+        ),
+        const SizedBox(width: 4),
+        _AwardSlot(
+          size: size,
+          filled: medalEarned(best, level.goldTime),
+          asset: GameSprites.bundle(GameSprites.medalGold),
+        ),
+        const SizedBox(width: 8),
+        _AwardSlot(
+          size: size,
+          filled: medalEarned(best, level.authorTime),
+          asset: GameSprites.bundle(GameSprites.authorGem),
+          frameCount: 5,
+        ),
+      ],
+    );
+  }
+}
+
+class _AwardSlot extends StatelessWidget {
+  const _AwardSlot({
+    required this.size,
+    required this.filled,
+    required this.asset,
+    this.frameCount = 8,
+  });
+
+  final double size;
+  final bool filled;
+  final String asset;
+  final int frameCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final empty = _EmptyAward(size: size);
+    if (!filled) {
+      return empty;
+    }
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        empty,
+        SpriteSheetAnimation(asset: asset, size: size, frameCount: frameCount),
+      ],
+    );
+  }
+}
+
+class _EmptyAward extends StatelessWidget {
+  const _EmptyAward({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0x33000000),
+        border: Border.all(color: Palette.hudMuted.withValues(alpha: 0.45)),
       ),
     );
   }
@@ -447,7 +583,7 @@ class _TimeChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
-        hasTime ? formatRunTime(best!) : '—',
+        hasTime ? formatRunTime(best!) : AppString.noTime,
         style: TextStyle(
           color: hasTime ? Palette.hud : Palette.hudMuted,
           fontWeight: FontWeight.w800,

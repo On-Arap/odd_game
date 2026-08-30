@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:odd/app_string.dart';
 import 'package:odd/domain/level_map.dart';
 import 'package:odd/game/hud_state.dart';
 import 'package:odd/game/palette.dart';
@@ -72,42 +73,42 @@ class MapMakerTile {
   final Color foreground;
 }
 
-const mapMakerTiles = [
+List<MapMakerTile> get mapMakerTiles => [
   MapMakerTile(
     code: TileCodes.empty,
-    label: 'Empty',
-    color: Color(0xFF0E0F16),
+    label: AppString.tileEmpty,
+    color: const Color(0xFF0E0F16),
     foreground: Palette.hudMuted,
   ),
   MapMakerTile(
     code: TileCodes.solid,
-    label: 'Solid',
+    label: AppString.tileSolid,
     color: Palette.solid,
     foreground: Palette.hud,
   ),
   MapMakerTile(
     code: TileCodes.ice,
-    label: 'Ice',
+    label: AppString.tileIce,
     color: Palette.ice,
-    foreground: Color(0xFF0E0F16),
+    foreground: const Color(0xFF0E0F16),
   ),
   MapMakerTile(
     code: TileCodes.mud,
-    label: 'Mud',
+    label: AppString.tileMud,
     color: Palette.mud,
     foreground: Palette.hud,
   ),
   MapMakerTile(
     code: TileCodes.player,
-    label: 'Player',
+    label: AppString.tilePlayer,
     color: Palette.player,
     foreground: Palette.playerEye,
   ),
   MapMakerTile(
     code: TileCodes.coin,
-    label: 'Coin',
+    label: AppString.tileCoin,
     color: Palette.coin,
-    foreground: Color(0xFF0E0F16),
+    foreground: const Color(0xFF0E0F16),
   ),
 ];
 
@@ -126,8 +127,8 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
 
   final _widthController = TextEditingController(text: '32');
   final _heightController = TextEditingController(text: '18');
-  final _idController = TextEditingController(text: 'new_map');
-  final _nameController = TextEditingController(text: 'New Map');
+  final _idController = TextEditingController(text: AppString.defaultMapId);
+  final _nameController = TextEditingController(text: AppString.defaultMapName);
 
   late List<String> _grid;
   late Future<MapMakerAssets> _assetsFuture;
@@ -153,7 +154,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
           if (!mounted) {
             return;
           }
-          _showMessage('Could not load sprites: $error');
+          _showMessage(AppString.spritesLoadError(error));
         });
   }
 
@@ -176,7 +177,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     final cols = int.tryParse(_widthController.text);
     final rows = int.tryParse(_heightController.text);
     if (cols == null || rows == null || cols < _minSize || rows < _minSize) {
-      _showMessage('Width and height must be positive numbers.');
+      _showMessage(AppString.sizeMustBePositive);
       return;
     }
 
@@ -220,10 +221,10 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     final payload = <String, Object>{
       'format': 1,
       'id': _idController.text.trim().isEmpty
-          ? 'new_map'
+          ? AppString.defaultMapId
           : _idController.text.trim(),
       'name': _nameController.text.trim().isEmpty
-          ? 'New Map'
+          ? AppString.defaultMapName
           : _nameController.text.trim(),
       'tileSize': 16,
       if (_authorTime != null) 'author_time': _jsonAuthorTime(_authorTime!),
@@ -243,17 +244,17 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     try {
       final decoded = jsonDecode(source.trim());
       if (decoded is! Map<String, dynamic>) {
-        return 'Expected a JSON object.';
+        return AppString.expectedJsonObject;
       }
 
       final gridRaw = decoded['grid'];
       if (gridRaw is! List || gridRaw.isEmpty) {
-        return 'Missing a non-empty "grid".';
+        return AppString.missingGrid;
       }
 
       final grid = gridRaw.map((row) {
         if (row is! String) {
-          throw FormatException('Grid rows must be strings.');
+          throw FormatException(AppString.gridRowsMustBeStrings);
         }
         return row;
       }).toList();
@@ -261,20 +262,20 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
       final cols = grid.first.length;
       final rows = grid.length;
       if (cols == 0) {
-        return 'Grid rows cannot be empty.';
+        return AppString.emptyGridRow;
       }
       if (cols < _minSize || rows < _minSize) {
-        return 'Grid width and height must be at least $_minSize.';
+        return AppString.gridMinSize(_minSize);
       }
 
       for (var row = 0; row < rows; row++) {
         if (grid[row].length != cols) {
-          return 'Row $row has uneven width.';
+          return AppString.unevenRow(row);
         }
         for (var col = 0; col < cols; col++) {
           final cell = grid[row][col];
           if (!_isValidCell(cell)) {
-            return 'Unknown tile "$cell" at ($col, $row). Use . # I M P C.';
+            return AppString.unknownTile(cell, col, row);
           }
         }
       }
@@ -305,7 +306,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     } on FormatException catch (error) {
       return error.message;
     } catch (error) {
-      return 'Invalid JSON.';
+      return AppString.invalidJson;
     }
   }
 
@@ -352,14 +353,14 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
       },
     );
     if (loaded == true && mounted) {
-      _showMessage('Map loaded.');
+      _showMessage(AppString.mapLoaded);
     }
   }
 
   /// Copie le JSON (avec author_time) une fois la map validée en Play.
   Future<void> _generate() async {
     if (_authorTime == null) {
-      _showMessage('Play and complete the map before generating.');
+      _showMessage(AppString.playBeforeGenerate);
       return;
     }
     final json = _buildJson();
@@ -371,7 +372,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Map JSON'),
+          title: Text(AppString.mapJson),
           content: SizedBox(
             width: 560,
             child: SingleChildScrollView(
@@ -381,7 +382,7 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
+              child: Text(AppString.close),
             ),
             FilledButton(
               onPressed: () async {
@@ -389,11 +390,11 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('JSON copied to clipboard')),
+                    SnackBar(content: Text(AppString.jsonCopied)),
                   );
                 }
               },
-              child: const Text('Copy'),
+              child: Text(AppString.copy),
             ),
           ],
         );
@@ -411,13 +412,8 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Map Maker'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pushReplacementNamed('/'),
-            child: const Text('Back to menu'),
-          ),
-        ],
+        automaticallyImplyLeading: false,
+        title: Text(AppString.mapMaker),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -429,17 +425,23 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                _sizeField(label: 'Width', controller: _widthController),
-                _sizeField(label: 'Height', controller: _heightController),
-                FilledButton(onPressed: _applySize, child: const Text('Apply')),
+                _sizeField(label: AppString.width, controller: _widthController),
+                _sizeField(
+                  label: AppString.height,
+                  controller: _heightController,
+                ),
+                FilledButton(
+                  onPressed: _applySize,
+                  child: Text(AppString.apply),
+                ),
                 SizedBox(
                   width: 160,
                   child: TextField(
                     controller: _idController,
-                    decoration: const InputDecoration(
-                      labelText: 'Map id',
+                    decoration: InputDecoration(
+                      labelText: AppString.mapId,
                       isDense: true,
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ),
@@ -447,10 +449,10 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
                   width: 180,
                   child: TextField(
                     controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Map name',
+                    decoration: InputDecoration(
+                      labelText: AppString.mapName,
                       isDense: true,
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ),
@@ -503,8 +505,8 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
               children: [
                 Text(
                   _authorTime == null
-                      ? 'Complete the map in Play to generate JSON.'
-                      : 'Validated ${formatRunTime(_authorTime!)}',
+                      ? AppString.generateHint
+                      : AppString.validatedTime(formatRunTime(_authorTime!)),
                   style: TextStyle(
                     color: _authorTime == null ? Palette.hudMuted : Palette.hud,
                     fontSize: 12,
@@ -518,17 +520,17 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
                   runSpacing: 8,
                   children: [
                     _footerButton(
-                      label: 'Export',
+                      label: AppString.export,
                       onPressed: _showExportDialog,
                       filled: false,
                     ),
                     _footerButton(
-                      label: 'Play',
+                      label: AppString.play,
                       onPressed: _play,
                       filled: true,
                     ),
                     _footerButton(
-                      label: 'Generate',
+                      label: AppString.generate,
                       onPressed: _authorTime == null ? null : _generate,
                       filled: true,
                     ),
@@ -670,7 +672,7 @@ class _ExportDialogState extends State<_ExportDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Export'),
+      title: Text(AppString.export),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(
@@ -683,13 +685,16 @@ class _ExportDialogState extends State<_ExportDialog> {
                 controller: _jsonController,
                 maxLines: 14,
                 style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-                decoration: const InputDecoration(
-                  hintText: 'Paste map JSON here…',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  hintText: AppString.pasteMapJson,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
-              FilledButton(onPressed: _export, child: const Text('Export')),
+              FilledButton(
+                onPressed: _export,
+                child: Text(AppString.export),
+              ),
             ],
           ),
         ),

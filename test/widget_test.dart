@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:odd/app.dart';
+import 'package:odd/app_string.dart';
+import 'package:odd/domain/level_map.dart';
 import 'package:odd/ui/game_screen.dart';
 import 'package:odd/ui/mapmaker_preview.dart';
 import 'package:odd/ui/mapmaker_screen.dart';
@@ -24,12 +26,9 @@ void main() {
     await tester.pumpWidget(const OddApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('ODD'), findsOneWidget);
-    expect(find.text('Jump Jump'), findsOneWidget);
-    expect(find.text('Wall Jump'), findsOneWidget);
-    expect(find.text('The Shaft'), findsOneWidget);
-    expect(find.text('Rome'), findsOneWidget);
-    expect(find.text('New Map'), findsNothing);
+    expect(find.text(AppString.appTitle), findsOneWidget);
+    expect(find.text('Tutorial'), findsOneWidget);
+    expect(find.text(AppString.defaultMapName), findsNothing);
   });
 
   test('mapmaker route is web-only', () {
@@ -41,19 +40,25 @@ void main() {
     await tester.pumpWidget(await _mapMakerApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Map Maker'), findsOneWidget);
-    expect(find.text('Generate'), findsOneWidget);
-    expect(find.text('Export'), findsOneWidget);
-    expect(find.text('Play'), findsOneWidget);
-    expect(find.text('Solid (#)'), findsOneWidget);
-    expect(find.text('Coin (C)'), findsOneWidget);
+    expect(find.text(AppString.mapMaker), findsOneWidget);
+    expect(find.text(AppString.generate), findsOneWidget);
+    expect(find.text(AppString.export), findsOneWidget);
+    expect(find.text(AppString.play), findsOneWidget);
+    expect(
+      find.text('${AppString.tileSolid} (${TileCodes.solid})'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('${AppString.tileCoin} (${TileCodes.coin})'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('export dialog loads pasted map json', (tester) async {
     await tester.pumpWidget(await _mapMakerApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Export').first);
+    await tester.tap(find.text(AppString.export).first);
     await tester.pumpAndSettle();
 
     const json = '''
@@ -71,10 +76,10 @@ void main() {
 ''';
 
     await tester.enterText(find.byKey(const Key('export-json-field')), json);
-    await tester.tap(find.widgetWithText(FilledButton, 'Export'));
+    await tester.tap(find.widgetWithText(FilledButton, AppString.export));
     await tester.pumpAndSettle();
 
-    expect(find.text('Map loaded.'), findsOneWidget);
+    expect(find.text(AppString.mapLoaded), findsOneWidget);
     expect(find.text('test_map'), findsOneWidget);
     expect(find.text('Test Map'), findsOneWidget);
     expect(find.text('3'), findsNWidgets(2));
@@ -116,14 +121,14 @@ void main() {
     await tester.pumpWidget(await _mapMakerApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Play'));
+    await tester.tap(find.text(AppString.play));
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('needs exactly one player spawn'),
+      find.textContaining(AppString.levelNeedsSpawn('draft.json')),
       findsOneWidget,
     );
-    expect(find.text('Map Maker'), findsOneWidget);
+    expect(find.text(AppString.mapMaker), findsOneWidget);
     expect(find.byType(GameScreen), findsNothing);
   });
 
@@ -131,7 +136,7 @@ void main() {
     await tester.pumpWidget(await _mapMakerApp());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Export').first);
+    await tester.tap(find.text(AppString.export).first);
     await tester.pumpAndSettle();
 
     const json = '''
@@ -148,26 +153,26 @@ void main() {
 }
 ''';
     await tester.enterText(find.byKey(const Key('export-json-field')), json);
-    await tester.tap(find.widgetWithText(FilledButton, 'Export'));
+    await tester.tap(find.widgetWithText(FilledButton, AppString.export));
     await tester.pumpAndSettle();
-    expect(find.text('Map loaded.'), findsOneWidget);
+    expect(find.text(AppString.mapLoaded), findsOneWidget);
 
     ScaffoldMessenger.of(
       tester.element(find.byType(MapMakerScreen)),
     ).hideCurrentSnackBar();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Play'));
+    await tester.tap(find.widgetWithText(FilledButton, AppString.play));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
 
     expect(find.byType(GameScreen), findsOneWidget);
-    expect(find.text('EDITOR'), findsOneWidget);
+    expect(find.text(AppString.editor), findsOneWidget);
 
-    await tester.tap(find.text('EDITOR'));
+    await tester.tap(find.text(AppString.editor));
     await tester.pumpAndSettle();
 
-    expect(find.text('Map Maker'), findsOneWidget);
+    expect(find.text(AppString.mapMaker), findsOneWidget);
     expect(find.text('playtest_map'), findsOneWidget);
     expect(find.text('Playtest Map'), findsOneWidget);
     expect(find.byType(GameScreen), findsNothing);
@@ -181,12 +186,14 @@ void main() {
 
     expect(
       tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Generate'))
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, AppString.generate),
+          )
           .onPressed,
       isNull,
     );
 
-    await tester.tap(find.text('Export').first);
+    await tester.tap(find.text(AppString.export).first);
     await tester.pumpAndSettle();
 
     const json = '''
@@ -204,7 +211,7 @@ void main() {
 }
 ''';
     await tester.enterText(find.byKey(const Key('export-json-field')), json);
-    await tester.tap(find.widgetWithText(FilledButton, 'Export'));
+    await tester.tap(find.widgetWithText(FilledButton, AppString.export));
     await tester.pumpAndSettle();
 
     ScaffoldMessenger.of(
@@ -212,10 +219,12 @@ void main() {
     ).hideCurrentSnackBar();
     await tester.pumpAndSettle();
 
-    expect(find.text('Validated 4.25'), findsOneWidget);
+    expect(find.text(AppString.validatedTime('4.25')), findsOneWidget);
     expect(
       tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Generate'))
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, AppString.generate),
+          )
           .onPressed,
       isNotNull,
     );

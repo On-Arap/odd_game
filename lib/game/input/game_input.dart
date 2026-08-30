@@ -5,11 +5,15 @@ class GameInput {
   bool runHeld = false;
   bool enabled = true;
 
+  /// Tutoriel run : le pad jump (et le clavier) sont ignorés.
+  bool allowJump = true;
+
   bool _touchJump = false;
   bool _keyboardJump = false;
   double _jumpBuffer = 0;
 
-  bool get jumpHeld => enabled && (_touchJump || _keyboardJump);
+  bool get jumpHeld =>
+      enabled && allowJump && (_touchJump || _keyboardJump);
 
   /// Maintien du saut depuis l'écran tactile.
   void setTouchJump(bool held) {
@@ -23,7 +27,7 @@ class GameInput {
 
   /// Relance le buffer si on vient d'appuyer (saut un peu en avance).
   bool _holdJump(bool wasHeld, bool held) {
-    final next = held && enabled;
+    final next = held && enabled && allowJump;
     if (next && !wasHeld) {
       _jumpBuffer = GameConfig.jumpBuffer;
     }
@@ -37,7 +41,7 @@ class GameInput {
     }
   }
 
-  bool get wantsJump => enabled && _jumpBuffer > 0;
+  bool get wantsJump => enabled && allowJump && _jumpBuffer > 0;
 
   /// Consomme le saut (évite un double saut sur le même appui).
   void consumeJump() => _jumpBuffer = 0;

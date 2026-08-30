@@ -9,6 +9,7 @@ abstract final class Palette {
   static const player = Color(0xFF2A7F78);
   static const playerEye = Color(0xFFFFF4E6);
   static const coin = Color(0xFFFFC53D);
+  static const authorGem = Color(0xFF16DB7F);
   static const hud = Color(0xFFE8ECF1);
   static const hudMuted = Color(0x99E8ECF1);
   static const menuCard = Color(0xFFACACAC);

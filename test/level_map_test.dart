@@ -71,6 +71,34 @@ void main() {
 ''';
     final level = LevelMap.parseJson(source, file: 'timed.json');
     expect(level.authorTime, 12.34);
+    expect(level.bronzeTime, isNull);
+    expect(level.silverTime, isNull);
+    expect(level.goldTime, isNull);
+  });
+
+  test('parses optional medal times', () {
+    const source = '''
+{
+  "format": 1,
+  "id": "medals",
+  "name": "Medals",
+  "tileSize": 16,
+  "author_time": 10,
+  "bronze_time": 20,
+  "silver_time": 15,
+  "gold_time": 12,
+  "grid": [
+    "###",
+    "#P#",
+    "#C#"
+  ]
+}
+''';
+    final level = LevelMap.parseJson(source, file: 'medals.json');
+    expect(level.bronzeTime, 20);
+    expect(level.silverTime, 15);
+    expect(level.goldTime, 12);
+    expect(level.authorTime, 10);
   });
 
   test('rejects unknown tiles and missing spawn', () {

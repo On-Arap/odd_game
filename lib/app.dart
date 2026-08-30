@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:odd/app_string.dart';
 import 'package:odd/ui/mapmaker_screen.dart';
 import 'package:odd/ui/menu_screen.dart';
 
@@ -22,7 +23,7 @@ class OddApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ODD',
+      title: AppString.appTitle,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,

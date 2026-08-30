@@ -1,10 +1,7 @@
 {
   "levels": [
-    "01_warmup.json",
-    "02_kick_turn.json",
-    "03_the_shaft.json",
-    "04_the_fall.json",
-    "05_corridor.json",
-    "06_real_shit.json"
+    "01_tutorial.json",
+    "02_folkin_around.json",
+    "03_mad_as_rabbits.json"
   ]
 }
