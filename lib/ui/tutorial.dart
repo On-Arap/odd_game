@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:odd/app_string.dart';
 import 'package:odd/data/tutorial_store.dart';
+import 'package:odd/game/config.dart';
 import 'package:odd/game/input/game_input.dart';
 import 'package:odd/ui/overlays/tutorial_double_jump_overlay.dart';
 import 'package:odd/ui/overlays/tutorial_hint_overlay.dart';
 import 'package:odd/ui/overlays/tutorial_medals_overlay.dart';
 import 'package:odd/ui/overlays/tutorial_walljump_overlay.dart';
+import 'package:video_player/video_player.dart';
 
 /// Étapes persistées et overlays du tutoriel en jeu.
 class Tutorial extends ChangeNotifier {
@@ -22,6 +24,11 @@ class Tutorial extends ChangeNotifier {
   var _levelIndex = 0;
   var _showRunTutorial = false;
   var _disposed = false;
+
+  VideoPlayerController? _walljumpPlayer;
+  VideoPlayerController? _doubleJumpPlayer;
+  Future<void>? _walljumpReady;
+  Future<void>? _doubleJumpReady;
 
   int? level;
   var showJumpHint = false;
@@ -81,7 +88,49 @@ class Tutorial extends ChangeNotifier {
     }
     level = stored;
     _input?.allowJump = !showRunHint;
+    unawaited(_preloadVideos(stored));
     notifyListeners();
+  }
+
+  /// Prépare les vidéos encore utiles pour ce palier de tuto.
+  Future<void> _preloadVideos(int tutorialLvl) async {
+    if (tutorialLvl < 3) {
+      _ensureWalljump();
+      await _walljumpReady;
+    }
+    if (GameConfig.allowDoubleJump && tutorialLvl < 4) {
+      _ensureDoubleJump();
+      await _doubleJumpReady;
+    }
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
+
+  VideoPlayerController _ensureWalljump() {
+    final existing = _walljumpPlayer;
+    if (existing != null) {
+      return existing;
+    }
+    final player = VideoPlayerController.asset(TutorialWalljumpOverlay.asset)
+      ..setVolume(0)
+      ..setLooping(true);
+    _walljumpPlayer = player;
+    _walljumpReady = player.initialize();
+    return player;
+  }
+
+  VideoPlayerController _ensureDoubleJump() {
+    final existing = _doubleJumpPlayer;
+    if (existing != null) {
+      return existing;
+    }
+    final player = VideoPlayerController.asset(TutorialDoubleJumpOverlay.asset)
+      ..setVolume(0)
+      ..setLooping(true);
+    _doubleJumpPlayer = player;
+    _doubleJumpReady = player.initialize();
+    return player;
   }
 
   void syncOnCoin({required int coinsCollected, required bool won}) {
@@ -118,11 +167,15 @@ class Tutorial extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (level == 3 && !showDoubleJumpModal) {
+    if (level == 3 && GameConfig.allowDoubleJump && !showDoubleJumpModal) {
       _pause?.call();
       showDoubleJumpModal = true;
       notifyListeners();
       return;
+    }
+    if (level == 3 && !GameConfig.allowDoubleJump) {
+      unawaited(_store.save(4));
+      level = 4;
     }
     if (level == 4 && !showMedalsModal) {
       _pause?.call();
@@ -223,12 +276,14 @@ class Tutorial extends ChangeNotifier {
 
   List<Widget> modalOverlays() {
     return [
-      if (showDoubleJumpModal)
+      if (GameConfig.allowDoubleJump && showDoubleJumpModal)
         TutorialDoubleJumpOverlay(
+          player: _ensureDoubleJump(),
           onContinue: () => unawaited(completeDoubleJump()),
         ),
       if (showWalljumpModal)
         TutorialWalljumpOverlay(
+          player: _ensureWalljump(),
           onContinue: () => unawaited(completeWalljump()),
         ),
       if (showMedalsModal)
@@ -239,6 +294,8 @@ class Tutorial extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _walljumpPlayer?.dispose();
+    _doubleJumpPlayer?.dispose();
     super.dispose();
   }
 }

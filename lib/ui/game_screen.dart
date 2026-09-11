@@ -162,13 +162,12 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   void dispose() {
-    _tutorial
-      ..removeListener(_onTutorialChanged)
-      ..dispose();
+    _tutorial.removeListener(_onTutorialChanged);
     _hud
       ..removeListener(_onHudChanged)
       ..dispose();
     super.dispose();
+    _tutorial.dispose();
   }
 
   /// Pop : en playtest, renvoie le meilleur temps de l'essai.

@@ -232,7 +232,7 @@ class Player extends PositionComponent with HasGameReference {
       scale.setValues(0.82, 1.22);
       return;
     }
-    if (!_doubleJumpAvailable) {
+    if (!GameConfig.allowDoubleJump || !_doubleJumpAvailable) {
       return;
     }
     velocity.y = GameConfig.doubleJumpSpeed;

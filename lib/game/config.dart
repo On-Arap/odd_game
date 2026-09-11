@@ -33,6 +33,7 @@ abstract final class GameConfig {
   static const airDecelTime = 0.5;
   static const airDecel = airMaxSpeed / airDecelTime;
   static const jumpSpeed = -540.0;
+  static const allowDoubleJump = false;
   static const doubleJumpSpeed = -500.0;
   static const wallJumpSpeed = -500.0;
   static const wallJumpX = 240.0;
