@@ -40,6 +40,16 @@ class _SpriteSheetAnimationState extends State<SpriteSheetAnimation>
     _load();
   }
 
+  @override
+  void didUpdateWidget(SpriteSheetAnimation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.asset != widget.asset) {
+      _image?.dispose();
+      _image = null;
+      _load();
+    }
+  }
+
   Future<void> _load() async {
     final data = await rootBundle.load(widget.asset);
     final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());

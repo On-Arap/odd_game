@@ -136,7 +136,6 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
     }
     final bests = await BestTimesStore().load();
     final tutorialLvl = await TutorialStore().load();
-    final maps = await _catalogIfChanged();
     if (!mounted) {
       return;
     }
@@ -144,10 +143,8 @@ class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
       _bests = bests;
       _tutorialLvl = tutorialLvl;
       _leaderboardRevision++;
-      if (maps != null) {
-        _applyMaps(maps.levels, maps.daily);
-      }
     });
+    unawaited(_refreshMapsIfChanged());
   }
 
   List<String> get _campaignIds => [
@@ -831,7 +828,12 @@ class _AwardSlot extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         empty,
-        SpriteSheetAnimation(asset: asset, size: size, frameCount: frameCount),
+        SpriteSheetAnimation(
+          key: ValueKey(asset),
+          asset: asset,
+          size: size,
+          frameCount: frameCount,
+        ),
       ],
     );
   }
