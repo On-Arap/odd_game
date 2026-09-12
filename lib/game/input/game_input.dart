@@ -12,8 +12,7 @@ class GameInput {
   bool _keyboardJump = false;
   double _jumpBuffer = 0;
 
-  bool get jumpHeld =>
-      enabled && allowJump && (_touchJump || _keyboardJump);
+  bool get jumpHeld => enabled && allowJump && (_touchJump || _keyboardJump);
 
   /// Maintien du saut depuis l'écran tactile.
   void setTouchJump(bool held) {

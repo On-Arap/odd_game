@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:odd/app.dart';
 import 'package:odd/app_string.dart';
+import 'package:odd/data/tutorial_store.dart';
 import 'package:odd/domain/level_map.dart';
+import 'package:odd/ui/admin_screen.dart';
 import 'package:odd/ui/game_screen.dart';
 import 'package:odd/ui/mapmaker_preview.dart';
 import 'package:odd/ui/mapmaker_screen.dart';
@@ -23,17 +25,42 @@ void main() {
   });
 
   testWidgets('menu lists bundled maps', (tester) async {
+    SharedPreferences.setMockInitialValues({TutorialStore.key: 1});
     await tester.pumpWidget(const OddApp());
     await tester.pumpAndSettle();
 
     expect(find.text(AppString.appTitle), findsOneWidget);
     expect(find.text('Tutorial'), findsOneWidget);
+    expect(find.text(AppString.levelNumber(0)), findsOneWidget);
+    expect(find.text(AppString.playLevel), findsOneWidget);
+    expect(find.text('Folkin\' Around'), findsNothing);
     expect(find.text(AppString.defaultMapName), findsNothing);
+    expect(find.byKey(const Key('tutorial-home-mask')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('campaign-tile-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Folkin\' Around'), findsOneWidget);
+    expect(find.text(AppString.levelNumber(1)), findsOneWidget);
+    expect(find.text('Tutorial'), findsNothing);
+
+    await tester.tap(find.text('Rome'));
+    await tester.pumpAndSettle();
+
+    expect(find.text(AppString.dailyMap), findsWidgets);
+    expect(find.text(AppString.levelNumber(1)), findsNothing);
+    expect(find.byType(GameScreen), findsNothing);
   });
 
   test('mapmaker route is web-only', () {
     expect(kIsWeb, isFalse);
     expect(OddApp.initialRoute(), '/');
+  });
+
+  testWidgets('admin screen builds', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: AdminScreen()));
+    await tester.pump();
+    expect(find.text(AppString.admin), findsOneWidget);
   });
 
   testWidgets('mapmaker screen builds', (tester) async {
@@ -219,7 +246,7 @@ void main() {
     ).hideCurrentSnackBar();
     await tester.pumpAndSettle();
 
-    expect(find.text(AppString.validatedTime('4.25')), findsOneWidget);
+    expect(find.text(AppString.validatedTime('4.250')), findsOneWidget);
     expect(
       tester
           .widget<FilledButton>(
@@ -228,5 +255,10 @@ void main() {
           .onPressed,
       isNotNull,
     );
+
+    await tester.tap(find.widgetWithText(FilledButton, AppString.generate));
+    await tester.pumpAndSettle();
+    expect(find.text(AppString.copy), findsOneWidget);
+    expect(find.text(AppString.upload), findsOneWidget);
   });
 }

@@ -4,6 +4,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:odd/app_string.dart';
 import 'package:odd/data/best_times_store.dart';
+import 'package:odd/data/leaderboard_store.dart';
 import 'package:odd/domain/level_map.dart';
 import 'package:odd/game/hud_state.dart';
 import 'package:odd/game/input/game_input.dart';
@@ -138,6 +139,7 @@ class _GameScreenState extends State<GameScreen> {
     }
 
     await _bests.record(levelId, time);
+    unawaited(const LeaderboardStore().submitBest(levelId, time));
   }
 
   /// Même règle que [BestTimes.record] pour le temps affiché.

@@ -4,7 +4,9 @@ A landscape 2D speedrun platformer. Collect every coin as fast as you can.
 
 Hold run to move the way you face. Jump on the left (or Space). The only way to turn is a wall jump.
 
-Maps live in `assets/maps/` as JSON grids. Ice (`I`) keeps your speed. Mud (`M`) caps it.
+Maps are JSON grids. Ice (`I`) keeps your speed. Mud (`M`) caps it. The copies
+in `assets/maps/` are an offline fallback. Live campaign and Daily maps load
+from Supabase so new levels do not need an app update. See `supabase/README.md`.
 
 ## Creating a new map
 
@@ -41,23 +43,8 @@ To edit an existing map, click **Export**, paste its JSON into the text field, a
 
 ### Add the map to the game
 
-1. Save the JSON as a new file in `assets/maps/`, for example `assets/maps/06_my_level.json`.
-2. Register it in `assets/maps/index.json` by adding the filename to the `levels` array:
-
-```json
-{
-  "levels": [
-    "01_warmup.json",
-    "02_kick_turn.json",
-    "03_the_shaft.json",
-    "04_corridor.json",
-    "05_the_fall.json",
-    "06_my_level.json"
-  ]
-}
-```
-
-3. Hot restart the app (or stop and run again). The new map appears on the menu.
+Paste the exported JSON into Supabase (`public.maps`) — no app release needed.
+See `supabase/README.md`. `assets/maps/` stays as an offline fallback.
 
 ### Map rules
 

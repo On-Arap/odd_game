@@ -34,10 +34,7 @@ class _TouchControlsState extends State<TouchControls> {
     );
   }
 
-  Widget _pad({
-    required Set<int> pointers,
-    required VoidCallback sync,
-  }) {
+  Widget _pad({required Set<int> pointers, required VoidCallback sync}) {
     return Expanded(
       child: Listener(
         behavior: HitTestBehavior.translucent,

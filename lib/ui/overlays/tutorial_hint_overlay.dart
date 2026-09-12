@@ -74,10 +74,7 @@ class _TutorialHintOverlayState extends State<TutorialHintOverlay>
       title: widget.title,
       subtitle: widget.subtitle,
     );
-    const mask = ColoredBox(
-      color: Color(0xB3000000),
-      child: SizedBox.expand(),
-    );
+    const mask = ColoredBox(color: Color(0xB3000000), child: SizedBox.expand());
     return FadeTransition(
       opacity: Tween<double>(begin: 1, end: 0).animate(_fade),
       child: Row(
@@ -92,11 +89,7 @@ class _TutorialHintOverlayState extends State<TutorialHintOverlay>
 }
 
 class _GlowHalf extends StatelessWidget {
-  const _GlowHalf({
-    required this.pulse,
-    required this.title,
-    this.subtitle,
-  });
+  const _GlowHalf({required this.pulse, required this.title, this.subtitle});
 
   final Animation<double> pulse;
   final String title;

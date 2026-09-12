@@ -120,7 +120,12 @@ void main() {
 
   test('constant accel reaches max speed from rest in runAccelTime', () {
     expect(
-      _approachFor(0, GameConfig.runSpeed, GameConfig.runAccel, GameConfig.runAccelTime),
+      _approachFor(
+        0,
+        GameConfig.runSpeed,
+        GameConfig.runAccel,
+        GameConfig.runAccelTime,
+      ),
       closeTo(GameConfig.runSpeed, 0.001),
     );
   });
@@ -139,7 +144,12 @@ void main() {
 
   test('constant decel stops from max speed in runDecelTime', () {
     expect(
-      _approachFor(GameConfig.runSpeed, 0, GameConfig.runDecel, GameConfig.runDecelTime),
+      _approachFor(
+        GameConfig.runSpeed,
+        0,
+        GameConfig.runDecel,
+        GameConfig.runDecelTime,
+      ),
       closeTo(0, 0.001),
     );
   });
@@ -158,14 +168,24 @@ void main() {
 
   test('air accel reaches airMaxSpeed from rest in airAccelTime', () {
     expect(
-      _approachFor(0, GameConfig.airMaxSpeed, GameConfig.airAccel, GameConfig.airAccelTime),
+      _approachFor(
+        0,
+        GameConfig.airMaxSpeed,
+        GameConfig.airAccel,
+        GameConfig.airAccelTime,
+      ),
       closeTo(GameConfig.airMaxSpeed, 0.001),
     );
   });
 
   test('air decel stops from airMaxSpeed in airDecelTime', () {
     expect(
-      _approachFor(GameConfig.airMaxSpeed, 0, GameConfig.airDecel, GameConfig.airDecelTime),
+      _approachFor(
+        GameConfig.airMaxSpeed,
+        0,
+        GameConfig.airDecel,
+        GameConfig.airDecelTime,
+      ),
       closeTo(0, 0.001),
     );
   });
@@ -192,12 +212,7 @@ void main() {
   });
 }
 
-double _approachFor(
-  double start,
-  double target,
-  double rate,
-  double duration,
-) {
+double _approachFor(double start, double target, double rate, double duration) {
   var speed = start;
   var time = 0.0;
   const dt = 1 / 60;

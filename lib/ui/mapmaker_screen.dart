@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:odd/app_string.dart';
+import 'package:odd/data/map_catalog_store.dart';
 import 'package:odd/domain/level_map.dart';
 import 'package:odd/game/hud_state.dart';
 import 'package:odd/game/palette.dart';
@@ -137,6 +138,9 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
   int _cols = 32;
   int _rows = 18;
   double? _authorTime;
+  double? _bronzeTime;
+  double? _silverTime;
+  double? _goldTime;
 
   @override
   void initState() {
@@ -227,16 +231,26 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
           ? AppString.defaultMapName
           : _nameController.text.trim(),
       'tileSize': 16,
-      if (_authorTime != null) 'author_time': _jsonAuthorTime(_authorTime!),
+      if (_authorTime != null) 'author_time': _jsonTime(_authorTime!),
+      if (_bronzeTime != null) 'bronze_time': _jsonTime(_bronzeTime!),
+      if (_silverTime != null) 'silver_time': _jsonTime(_silverTime!),
+      if (_goldTime != null) 'gold_time': _jsonTime(_goldTime!),
       'grid': _grid,
     };
     const encoder = JsonEncoder.withIndent('  ');
     return encoder.convert(payload);
   }
 
-  /// Arrondi aux centièmes pour le JSON.
-  static double _jsonAuthorTime(double seconds) {
-    return (seconds * 100).round() / 100;
+  /// Arrondi aux millièmes pour le JSON.
+  static double _jsonTime(double seconds) {
+    return (seconds * 1000).round() / 1000;
+  }
+
+  static double? _readTime(Object? raw) {
+    if (raw is num && raw >= 0) {
+      return raw.toDouble();
+    }
+    return null;
   }
 
   /// Charge une map collée ; message d'erreur ou null.
@@ -282,17 +296,14 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
 
       final id = decoded['id'];
       final name = decoded['name'];
-      final authorTimeRaw = decoded['author_time'];
-      double? authorTime;
-      if (authorTimeRaw is num && authorTimeRaw >= 0) {
-        authorTime = authorTimeRaw.toDouble();
-      }
-
       setState(() {
         _grid = grid;
         _cols = cols;
         _rows = rows;
-        _authorTime = authorTime;
+        _authorTime = _readTime(decoded['author_time']);
+        _bronzeTime = _readTime(decoded['bronze_time']);
+        _silverTime = _readTime(decoded['silver_time']);
+        _goldTime = _readTime(decoded['gold_time']);
         _widthController.text = cols.toString();
         _heightController.text = rows.toString();
         if (id is String && id.isNotEmpty) {
@@ -357,48 +368,28 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
     }
   }
 
-  /// Copie le JSON (avec author_time) une fois la map validée en Play.
+  Future<String?> _capturePreview() async {
+    final assets = _assets;
+    if (assets == null) {
+      return null;
+    }
+    return MapPreviewRenderer.pngBase64(grid: _grid, assets: assets);
+  }
+
+  /// Affiche le JSON (avec author_time) une fois la map validée en Play.
   Future<void> _generate() async {
     if (_authorTime == null) {
       _showMessage(AppString.playBeforeGenerate);
       return;
     }
     final json = _buildJson();
-    await Clipboard.setData(ClipboardData(text: json));
     if (!mounted) {
       return;
     }
     await showDialog<void>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(AppString.mapJson),
-          content: SizedBox(
-            width: 560,
-            child: SingleChildScrollView(
-              child: SelectableText(json, style: const TextStyle(fontSize: 12)),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(AppString.close),
-            ),
-            FilledButton(
-              onPressed: () async {
-                await Clipboard.setData(ClipboardData(text: json));
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(AppString.jsonCopied)),
-                  );
-                }
-              },
-              child: Text(AppString.copy),
-            ),
-          ],
-        );
-      },
+      builder: (context) =>
+          _GenerateJsonDialog(json: json, capturePreview: _capturePreview),
     );
   }
 
@@ -425,7 +416,10 @@ class _MapMakerScreenState extends State<MapMakerScreen> {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                _sizeField(label: AppString.width, controller: _widthController),
+                _sizeField(
+                  label: AppString.width,
+                  controller: _widthController,
+                ),
                 _sizeField(
                   label: AppString.height,
                   controller: _heightController,
@@ -659,10 +653,7 @@ class _ExportDialogState extends State<_ExportDialog> {
                 ),
               ),
               const SizedBox(height: 12),
-              FilledButton(
-                onPressed: _export,
-                child: Text(AppString.export),
-              ),
+              FilledButton(onPressed: _export, child: Text(AppString.export)),
             ],
           ),
         ),
@@ -706,6 +697,272 @@ class _PaletteTile extends StatelessWidget {
             fontSize: 13,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _GenerateJsonDialog extends StatefulWidget {
+  const _GenerateJsonDialog({required this.json, required this.capturePreview});
+
+  final String json;
+  final Future<String?> Function() capturePreview;
+
+  @override
+  State<_GenerateJsonDialog> createState() => _GenerateJsonDialogState();
+}
+
+class _GenerateJsonDialogState extends State<_GenerateJsonDialog> {
+  late final TextEditingController _bronze;
+  late final TextEditingController _silver;
+  late final TextEditingController _gold;
+  var _uploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final data = _decode(widget.json);
+    _bronze = TextEditingController(text: _timeText(data?['bronze_time']));
+    _silver = TextEditingController(text: _timeText(data?['silver_time']));
+    _gold = TextEditingController(text: _timeText(data?['gold_time']));
+  }
+
+  @override
+  void dispose() {
+    _bronze.dispose();
+    _silver.dispose();
+    _gold.dispose();
+    super.dispose();
+  }
+
+  static Map<String, dynamic>? _decode(String source) {
+    try {
+      final decoded = jsonDecode(source);
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  static String _timeText(Object? raw) {
+    if (raw is num && raw >= 0) {
+      return raw.toString();
+    }
+    return '';
+  }
+
+  static double _jsonTime(double seconds) {
+    return (seconds * 1000).round() / 1000;
+  }
+
+  static double? _parseTime(String text) {
+    final trimmed = text.trim().replaceAll(',', '.');
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return double.tryParse(trimmed);
+  }
+
+  String? _jsonWithMedalTimes() {
+    final data = _decode(widget.json);
+    if (data == null) {
+      return widget.json;
+    }
+    final bronze = _parseTime(_bronze.text);
+    final silver = _parseTime(_silver.text);
+    final gold = _parseTime(_gold.text);
+    if ((_bronze.text.trim().isNotEmpty && bronze == null) ||
+        (_silver.text.trim().isNotEmpty && silver == null) ||
+        (_gold.text.trim().isNotEmpty && gold == null)) {
+      return null;
+    }
+    if (bronze != null) {
+      data['bronze_time'] = _jsonTime(bronze);
+    } else {
+      data.remove('bronze_time');
+    }
+    if (silver != null) {
+      data['silver_time'] = _jsonTime(silver);
+    } else {
+      data.remove('silver_time');
+    }
+    if (gold != null) {
+      data['gold_time'] = _jsonTime(gold);
+    } else {
+      data.remove('gold_time');
+    }
+    return const JsonEncoder.withIndent('  ').convert(data);
+  }
+
+  Future<void> _copy() async {
+    final json = _jsonWithMedalTimes();
+    if (json == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppString.invalidMedalTime)));
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: json));
+    if (!mounted) {
+      return;
+    }
+    Navigator.pop(context);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(AppString.jsonCopied)));
+  }
+
+  Future<void> _upload() async {
+    final json = _jsonWithMedalTimes();
+    if (json == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppString.invalidMedalTime)));
+      return;
+    }
+    setState(() => _uploading = true);
+    try {
+      const catalog = MapCatalogStore();
+      final map = catalog.parseJson(json);
+      final preview = await widget.capturePreview();
+      final existing = await catalog.existingMap(map.id);
+      if (!mounted) {
+        return;
+      }
+      if (existing != null) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: Text(AppString.mapOverwriteTitle),
+              content: Text(
+                AppString.mapOverwriteBody(existing.name, existing.timeCount),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text(AppString.cancel),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: Text(AppString.overwrite),
+                ),
+              ],
+            );
+          },
+        );
+        if (confirmed != true) {
+          if (mounted) {
+            setState(() => _uploading = false);
+          }
+          return;
+        }
+        await catalog.replaceMap(map, previewImg: preview);
+      } else {
+        await catalog.insertMap(map, previewImg: preview);
+      }
+      if (!mounted) {
+        return;
+      }
+      Navigator.pop(context);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(AppString.mapUploaded)));
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _uploading = false);
+      final message = switch (error) {
+        MapUploadException(:final message) => message,
+        FormatException(:final message) => message,
+        _ => AppString.mapUploadFailed(error),
+      };
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(AppString.mapJson),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                AppString.medalTimesHint,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              _MedalTimeField(
+                label: AppString.bronzeTime,
+                controller: _bronze,
+                enabled: !_uploading,
+              ),
+              const SizedBox(height: 8),
+              _MedalTimeField(
+                label: AppString.silverTime,
+                controller: _silver,
+                enabled: !_uploading,
+              ),
+              const SizedBox(height: 8),
+              _MedalTimeField(
+                label: AppString.goldTime,
+                controller: _gold,
+                enabled: !_uploading,
+              ),
+              const SizedBox(height: 16),
+              SelectableText(widget.json, style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _uploading ? null : () => Navigator.pop(context),
+          child: Text(AppString.close),
+        ),
+        FilledButton(
+          onPressed: _uploading ? null : _copy,
+          child: Text(AppString.copy),
+        ),
+        FilledButton(
+          onPressed: _uploading ? null : _upload,
+          child: Text(AppString.upload),
+        ),
+      ],
+    );
+  }
+}
+
+class _MedalTimeField extends StatelessWidget {
+  const _MedalTimeField({
+    required this.label,
+    required this.controller,
+    required this.enabled,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      enabled: enabled,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        isDense: true,
       ),
     );
   }

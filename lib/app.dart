@@ -2,8 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:odd/app_string.dart';
+import 'package:odd/data/supabase_config.dart';
+import 'package:odd/ui/admin_screen.dart';
 import 'package:odd/ui/mapmaker_screen.dart';
 import 'package:odd/ui/menu_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OddApp extends StatelessWidget {
   const OddApp({super.key});
@@ -17,7 +20,44 @@ class OddApp extends StatelessWidget {
     if (path == '/mapmaker' || path.endsWith('/mapmaker')) {
       return '/mapmaker';
     }
+    if (path == '/admin' || path.endsWith('/admin')) {
+      return '/admin';
+    }
     return '/';
+  }
+
+  static Route<void> routeFor(RouteSettings settings) {
+    switch (settings.name) {
+      case '/mapmaker':
+        // L'éditeur n'existe pas sur mobile : on renvoie au menu.
+        if (!kIsWeb) {
+          return MaterialPageRoute<void>(
+            settings: settings,
+            builder: (_) => const MenuScreen(),
+          );
+        }
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => const MapMakerScreen(),
+        );
+      case '/admin':
+        if (!kIsWeb) {
+          return MaterialPageRoute<void>(
+            settings: settings,
+            builder: (_) => const MenuScreen(),
+          );
+        }
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => const AdminScreen(),
+        );
+      case '/':
+      default:
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => const MenuScreen(),
+        );
+    }
   }
 
   @override
@@ -36,25 +76,10 @@ class OddApp extends StatelessWidget {
         fontFamily: 'Roboto',
       ),
       initialRoute: initialRoute(),
-      onGenerateRoute: (settings) {
-        switch (settings.name) {
-          case '/mapmaker':
-            // L'éditeur n'existe pas sur mobile : on renvoie au menu.
-            if (!kIsWeb) {
-              return MaterialPageRoute<void>(
-                builder: (_) => const MenuScreen(),
-              );
-            }
-            return MaterialPageRoute<void>(
-              builder: (_) => const MapMakerScreen(),
-            );
-          case '/':
-          default:
-            return MaterialPageRoute<void>(
-              builder: (_) => const MenuScreen(),
-            );
-        }
-      },
+      // Sans ça, `/admin` et `/mapmaker` empilent aussi `/` (MenuScreen),
+      // et le dialog nickname s'affiche par-dessus.
+      onGenerateInitialRoutes: (name) => [routeFor(RouteSettings(name: name))],
+      onGenerateRoute: (settings) => routeFor(settings),
     );
   }
 }
@@ -62,8 +87,24 @@ class OddApp extends StatelessWidget {
 /// Landscape immersif sauf dans l'éditeur web.
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final mapMaker = kIsWeb && OddApp.initialRoute() == '/mapmaker';
-  if (!mapMaker) {
+  if (SupabaseConfig.isConfigured) {
+    await Supabase.initialize(
+      url: SupabaseConfig.url,
+      publishableKey: SupabaseConfig.anonKey,
+    );
+    SupabaseConfig.initialized = true;
+    debugPrint('Supabase ready (${SupabaseConfig.url})');
+  } else {
+    debugPrint(
+      'Supabase skipped: set SUPABASE_URL and SUPABASE_ANON_KEY '
+      '(config "odd_game (supabase debug)").',
+    );
+  }
+  final webTool =
+      kIsWeb &&
+      (OddApp.initialRoute() == '/mapmaker' ||
+          OddApp.initialRoute() == '/admin');
+  if (!webTool) {
     await SystemChrome.setPreferredOrientations(const [
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,

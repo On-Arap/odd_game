@@ -109,10 +109,7 @@ class LevelMap {
   }
 
   /// Parse le JSON texte d'un fichier de map.
-  factory LevelMap.parseJson(
-    String source, {
-    required String file,
-  }) {
+  factory LevelMap.parseJson(String source, {required String file}) {
     final decoded = jsonDecode(source);
     if (decoded is! Map<String, dynamic>) {
       throw FormatException(AppString.levelNotJsonObject(file));
@@ -121,15 +118,10 @@ class LevelMap {
   }
 
   /// Valide le JSON, trouve P et les C, construit le [LevelMap].
-  factory LevelMap.fromJson(
-    Map<String, dynamic> json, {
-    required String file,
-  }) {
+  factory LevelMap.fromJson(Map<String, dynamic> json, {required String file}) {
     final format = json['format'];
     if (format != 1) {
-      throw FormatException(
-        AppString.levelUnsupportedFormat(file, format),
-      );
+      throw FormatException(AppString.levelUnsupportedFormat(file, format));
     }
 
     final id = json['id'];
@@ -153,16 +145,13 @@ class LevelMap {
     if (gridRaw is! List || gridRaw.isEmpty) {
       throw FormatException(AppString.levelMissingGrid(file));
     }
-    if (authorTimeRaw != null &&
-        (authorTimeRaw is! num || authorTimeRaw < 0)) {
+    if (authorTimeRaw != null && (authorTimeRaw is! num || authorTimeRaw < 0)) {
       throw FormatException(AppString.levelInvalidAuthorTime(file));
     }
-    if (bronzeTimeRaw != null &&
-        (bronzeTimeRaw is! num || bronzeTimeRaw < 0)) {
+    if (bronzeTimeRaw != null && (bronzeTimeRaw is! num || bronzeTimeRaw < 0)) {
       throw FormatException(AppString.levelInvalidBronzeTime(file));
     }
-    if (silverTimeRaw != null &&
-        (silverTimeRaw is! num || silverTimeRaw < 0)) {
+    if (silverTimeRaw != null && (silverTimeRaw is! num || silverTimeRaw < 0)) {
       throw FormatException(AppString.levelInvalidSilverTime(file));
     }
     if (goldTimeRaw != null && (goldTimeRaw is! num || goldTimeRaw < 0)) {
@@ -204,9 +193,7 @@ class LevelMap {
             break;
           case TileCodes.player:
             if (spawn != null) {
-              throw FormatException(
-                AppString.levelMultipleSpawns(file),
-              );
+              throw FormatException(AppString.levelMultipleSpawns(file));
             }
             spawn = GridPos(col, row);
           case TileCodes.coin:
@@ -244,9 +231,7 @@ class LevelMap {
       silverTime: silverTimeRaw == null
           ? null
           : (silverTimeRaw as num).toDouble(),
-      goldTime: goldTimeRaw == null
-          ? null
-          : (goldTimeRaw as num).toDouble(),
+      goldTime: goldTimeRaw == null ? null : (goldTimeRaw as num).toDouble(),
     );
   }
 }

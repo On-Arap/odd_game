@@ -5,6 +5,31 @@ bool medalEarned(double? time, double? target) {
 
 enum MedalKind { bronze, silver, gold }
 
+/// Meilleure récompense déjà débloquée (auteur > or > argent > bronze).
+enum BestAward { none, bronze, silver, gold, author }
+
+BestAward bestAwardFor({
+  required double? best,
+  required double? bronzeTime,
+  required double? silverTime,
+  required double? goldTime,
+  required double? authorTime,
+}) {
+  if (medalEarned(best, authorTime)) {
+    return BestAward.author;
+  }
+  if (medalEarned(best, goldTime)) {
+    return BestAward.gold;
+  }
+  if (medalEarned(best, silverTime)) {
+    return BestAward.silver;
+  }
+  if (medalEarned(best, bronzeTime)) {
+    return BestAward.bronze;
+  }
+  return BestAward.none;
+}
+
 /// How a medal should appear on the win screen.
 enum MedalReveal { empty, owned, justEarned }
 

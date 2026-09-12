@@ -113,9 +113,7 @@ class TutorialModalCard extends StatelessWidget {
                             style: FilledButton.styleFrom(
                               backgroundColor: Palette.menuAccent,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 12,
-                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
                             child: Text(
                               AppString.ok,

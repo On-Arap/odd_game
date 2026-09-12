@@ -15,6 +15,19 @@ class AppString {
   static String retry = 'RETRY';
   static String next = 'NEXT';
   static String ok = 'OK';
+  static String nicknameTitle = 'Choose a nickname';
+  static String nicknameHint = '3–16 letters, numbers, _';
+  static String nicknameTaken = 'That nickname is taken.';
+  static String nicknameTooShort = 'At least 3 characters.';
+  static String nicknameTooLong = '16 characters max.';
+  static String nicknameBadChars = 'Use letters, numbers or _.';
+  static String nicknameSave = 'SAVE';
+  static String onlineProfileError(Object error) =>
+      'Online profile failed.\n$error';
+  static String leaderboardEmpty = 'No times yet.';
+  static String leaderboardLoadError = 'Could not load the leaderboard.';
+  static String myRank(int rank, String formatted) =>
+      'Your rank : $rank, Your time : $formatted';
 
   static String clear = 'CLEAR';
   static String personalBest = 'PERSONAL BEST :';
@@ -43,9 +56,34 @@ class AppString {
   static String defaultMapName = 'New Map';
   static String export = 'Export';
   static String play = 'Play';
+  static String playLevel = 'PLAY';
+  static String levelNumber(int index) =>
+      '#${(index + 1).toString().padLeft(2, '0')}';
   static String generate = 'Generate';
   static String close = 'Close';
   static String copy = 'Copy';
+  static String upload = 'Upload';
+  static String bronzeTime = 'Bronze time';
+  static String silverTime = 'Silver time';
+  static String goldTime = 'Gold time';
+  static String medalTimesHint = 'Medal times in seconds';
+  static String invalidMedalTime = 'Medal times must be empty or a number ≥ 0.';
+  static String cancel = 'Cancel';
+  static String confirm = 'CONFIRM';
+  static String overwrite = 'OVERWRITE';
+  static String mapUploaded = 'Map uploaded.';
+  static String mapUploadNeedBackend = 'Supabase is not configured.';
+  static String mapUploadFailed(Object error) => 'Upload failed.\n$error';
+  static String mapOverwriteTitle = 'Overwrite this map?';
+  static String mapOverwriteBody(String name, int times) {
+    final timesLine = times == 1
+        ? '1 recorded time will be deleted.'
+        : '$times recorded times will be deleted.';
+    return '"$name" already exists on the server.\n'
+        'This will replace the map data.\n'
+        '$timesLine';
+  }
+
   static String mapJson = 'Map JSON';
   static String pasteMapJson = 'Paste map JSON here…';
   static String mapLoaded = 'Map loaded.';
@@ -53,7 +91,8 @@ class AppString {
   static String generateHint = 'Complete the map in Play to generate JSON.';
   static String playBeforeGenerate =
       'Play and complete the map before generating.';
-  static String sizeMustBePositive = 'Width and height must be positive numbers.';
+  static String sizeMustBePositive =
+      'Width and height must be positive numbers.';
   static String expectedJsonObject = 'Expected a JSON object.';
   static String missingGrid = 'Missing a non-empty "grid".';
   static String gridRowsMustBeStrings = 'Grid rows must be strings.';
@@ -102,16 +141,48 @@ class AppString {
       'Level $file row $row is $width wide, expected $expected.';
   static String levelMultipleSpawns(String file) =>
       'Level $file has more than one player spawn (P).';
-  static String levelUnknownTile(
-    String file,
-    String cell,
-    int col,
-    int row,
-  ) =>
+  static String levelUnknownTile(String file, String cell, int col, int row) =>
       'Level $file has unknown tile "$cell" at ($col, $row). '
       'Use . # I M P C';
   static String levelNeedsSpawn(String file) =>
       'Level $file needs exactly one player spawn (P).';
   static String levelNeedsCoin(String file) =>
       'Level $file needs at least one coin (C).';
+
+  static String admin = 'Admin';
+  static String adminCampaign = 'Campaign maps';
+  static String adminCampaignHint =
+      'Check maps to add them. Order is the order you check them (15 max).';
+  static String adminAddMap = 'Add map';
+  static String adminDaily = 'Daily map';
+  static String adminNoDaily = 'None';
+  static String adminValidate = 'VALIDATE';
+  static String adminSaved = 'Content saved.';
+  static String adminTooManyMaps = '15 maps maximum.';
+  static String adminNoMaps =
+      'No maps in map_data yet. Upload one from Map Maker.';
+  static String adminDanger = 'Danger zone';
+  static String adminDeleteMap = 'Delete map';
+  static String adminDeleteMapTimes = 'Delete times for this map';
+  static String adminDeleteAllTimes = 'Delete all times';
+  static String adminDeleteAllUsers = 'Delete all users';
+  static String adminConfirmTitle = 'Are you sure?';
+  static String adminConfirmDeleteMap(String name) =>
+      'Delete "$name" and every recorded time on it? This cannot be undone.';
+  static String adminConfirmMapTimes(String name) =>
+      'Delete every recorded time on "$name"?';
+  static String adminConfirmAllTimes =
+      'Delete every recorded time in the game?';
+  static String adminConfirmAllUsers =
+      'Delete every user, profile, and recorded time? This cannot be undone.';
+  static String adminDeletedMap(int count) => count == 0
+      ? 'Map deleted.'
+      : count == 1
+      ? 'Map deleted, and 1 time.'
+      : 'Map deleted, and $count times.';
+  static String adminDeletedTimes(int count) =>
+      count == 1 ? 'Deleted 1 time.' : 'Deleted $count times.';
+  static String adminDeletedUsers(int count) =>
+      count == 1 ? 'Deleted 1 user.' : 'Deleted $count users.';
+  static String adminFailed(Object error) => 'Admin action failed.\n$error';
 }

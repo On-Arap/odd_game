@@ -19,7 +19,8 @@ class BestTimesStore {
     }
     return BestTimes({
       for (final entry in decoded.entries)
-        if (entry.value is num) entry.key.toString(): (entry.value as num).toDouble(),
+        if (entry.value is num)
+          entry.key.toString(): (entry.value as num).toDouble(),
     });
   }
 
@@ -31,10 +32,7 @@ class BestTimesStore {
       return current;
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _key,
-      jsonEncode(next.byLevelId),
-    );
+    await prefs.setString(_key, jsonEncode(next.byLevelId));
     return next;
   }
 }

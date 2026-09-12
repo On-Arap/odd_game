@@ -1,20 +1,27 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:odd/app_string.dart';
+import 'package:odd/data/auth_store.dart';
 import 'package:odd/data/best_times_store.dart';
+import 'package:odd/data/leaderboard_store.dart';
 import 'package:odd/data/level_repository.dart';
+import 'package:odd/data/supabase_config.dart';
 import 'package:odd/data/tutorial_store.dart';
-import 'package:odd/ui/tutorial.dart';
 import 'package:odd/domain/best_times.dart';
 import 'package:odd/domain/level_map.dart';
 import 'package:odd/domain/medals.dart';
 import 'package:odd/game/hud_state.dart';
 import 'package:odd/game/palette.dart';
 import 'package:odd/game/sprites.dart';
+import 'package:odd/ui/game_dialog_card.dart';
 import 'package:odd/ui/game_screen.dart';
+import 'package:odd/ui/leaderboard_list.dart';
+import 'package:odd/ui/nickname_dialog.dart';
 import 'package:odd/ui/sprite_sheet_animation.dart';
+import 'package:odd/ui/tutorial.dart';
 
 class MenuScreen extends StatefulWidget {
   const MenuScreen({super.key});
@@ -23,17 +30,35 @@ class MenuScreen extends StatefulWidget {
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-class _MenuScreenState extends State<MenuScreen> {
+class _MenuScreenState extends State<MenuScreen> with WidgetsBindingObserver {
   List<LevelMap>? _levels;
   LevelMap? _daily;
   Object? _error;
   BestTimes _bests = const BestTimes({});
   int _tutorialLvl = 0;
+  int _selectedIndex = 0;
+  var _dailySelected = false;
+  int _leaderboardRevision = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        (ModalRoute.of(context)?.isCurrent ?? false)) {
+      unawaited(_refreshMapsIfChanged());
+    }
   }
 
   /// Charge les maps bundle, la daily map, et les PB.
@@ -48,12 +73,12 @@ class _MenuScreenState extends State<MenuScreen> {
         return;
       }
       setState(() {
-        _levels = levels;
-        _daily = daily;
         _bests = bests;
         _tutorialLvl = tutorialLvl;
         _error = null;
+        _applyMaps(levels, daily);
       });
+      unawaited(_ensureOnlineProfile());
     } catch (error) {
       if (!mounted) {
         return;
@@ -64,7 +89,34 @@ class _MenuScreenState extends State<MenuScreen> {
 
   bool get _tutorialLocksMaps => Tutorial.locksMaps(_tutorialLvl);
 
-  /// Ouvre le niveau puis rafraîchit les temps au retour.
+  Future<void> _ensureOnlineProfile() async {
+    if (!SupabaseConfig.isReady || !mounted) {
+      return;
+    }
+    try {
+      final auth = const AuthStore();
+      await auth.ensureSession();
+      final name = await auth.displayName();
+      if (!mounted) {
+        return;
+      }
+      if (name == null && (ModalRoute.of(context)?.isCurrent ?? false)) {
+        final saved = await showNicknameDialog(context);
+        if (saved && mounted) {
+          await const LeaderboardStore().syncLocalBests(_bests);
+        }
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppString.onlineProfileError(error))),
+      );
+    }
+  }
+
+  /// Ouvre le niveau puis rafraîchit temps + maps (si le catalogue DB a changé).
   Future<void> _openLevel(
     List<LevelMap> levels,
     int index, {
@@ -84,13 +136,58 @@ class _MenuScreenState extends State<MenuScreen> {
     }
     final bests = await BestTimesStore().load();
     final tutorialLvl = await TutorialStore().load();
+    final maps = await _catalogIfChanged();
     if (!mounted) {
       return;
     }
     setState(() {
       _bests = bests;
       _tutorialLvl = tutorialLvl;
+      _leaderboardRevision++;
+      if (maps != null) {
+        _applyMaps(maps.levels, maps.daily);
+      }
     });
+  }
+
+  List<String> get _campaignIds => [
+    for (final level in _levels ?? const <LevelMap>[]) level.id,
+  ];
+
+  Future<({List<LevelMap> levels, LevelMap daily})?> _catalogIfChanged() {
+    return LevelRepository().loadIfCatalogChanged(
+      campaignIds: _campaignIds,
+      dailyId: _daily?.id,
+    );
+  }
+
+  Future<void> _refreshMapsIfChanged() async {
+    final maps = await _catalogIfChanged();
+    if (!mounted || maps == null) {
+      return;
+    }
+    setState(() => _applyMaps(maps.levels, maps.daily));
+  }
+
+  void _applyMaps(List<LevelMap> levels, LevelMap daily) {
+    final selectedId =
+        !_dailySelected &&
+            _levels != null &&
+            _levels!.isNotEmpty &&
+            _selectedIndex >= 0 &&
+            _selectedIndex < _levels!.length
+        ? _levels![_selectedIndex].id
+        : null;
+    _levels = levels;
+    _daily = daily;
+    if (selectedId != null) {
+      final index = levels.indexWhere((level) => level.id == selectedId);
+      _selectedIndex = index >= 0 ? index : 0;
+      return;
+    }
+    if (_selectedIndex >= levels.length) {
+      _selectedIndex = 0;
+    }
   }
 
   Future<void> _openCampaign(List<LevelMap> levels, int index) async {
@@ -109,6 +206,17 @@ class _MenuScreenState extends State<MenuScreen> {
       return;
     }
     await _openLevel([daily], 0);
+  }
+
+  void _selectCampaign(int index) {
+    setState(() {
+      _selectedIndex = index;
+      _dailySelected = false;
+    });
+  }
+
+  void _selectDaily() {
+    setState(() => _dailySelected = true);
   }
 
   @override
@@ -133,99 +241,181 @@ class _MenuScreenState extends State<MenuScreen> {
     if (levels == null || daily == null) {
       return const Center(child: CircularProgressIndicator());
     }
+    final selected = _dailySelected ? daily : levels[_selectedIndex];
+    final selectedLocked =
+        _tutorialLocksMaps && (_dailySelected || _selectedIndex > 0);
+    final selectedLabel = _dailySelected
+        ? AppString.dailyMap
+        : AppString.levelNumber(_selectedIndex);
+    final showPlayMask = _tutorialLvl == 0;
     final total = _bests.totalFor(levels.map((level) => level.id));
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          const tileGap = 8.0;
-          const listTop = 24.0;
-          const listBottom = 8.0;
-          final listHeight = constraints.maxHeight - listTop - listBottom;
-          final filledTileHeight =
-              (listHeight - (levels.length - 1) * tileGap) / levels.length;
-          final tileHeight = filledTileHeight.clamp(56.0, 80.0);
-
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: 1,
-                child: LayoutBuilder(
-                  builder: (context, leftBox) {
-                    const leftInset = 12.0;
-                    const dailyExtraWidth = 40.0;
-                    final dailyTileWidth =
-                        leftBox.maxWidth - leftInset + dailyExtraWidth;
-
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        leftInset,
-                        32,
-                        0,
-                        listBottom,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _Brand(total: total),
-                          const Spacer(),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: SizedBox(
-                              width: dailyTileWidth,
-                              height: tileHeight,
-                              child: _LevelTile(
-                                level: daily,
-                                backgroundLabel: AppString.dailyMap,
-                                title: daily.name,
-                                best: _bests.forLevel(daily.id),
-                                locked: _tutorialLocksMaps,
-                                onTap: () => _openDaily(daily),
-                              ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            flex: 5,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
+              child: LayoutBuilder(
+                builder: (context, leftBox) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxHeight: leftBox.maxHeight * 0.42,
+                                  ),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.topLeft,
+                                    child: SizedBox(
+                                      width: leftBox.maxWidth,
+                                      child: _Brand(total: total),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  selectedLabel,
+                                  style: const TextStyle(
+                                    color: Palette.menuAccent,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                    letterSpacing: 2,
+                                  ),
+                                ),
+                                Text(
+                                  selected.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Palette.hud,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 22,
+                                    height: 1.15,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Expanded(
+                                  child: LeaderboardList(
+                                    key: ValueKey(
+                                      '${selected.id}-$_leaderboardRevision',
+                                    ),
+                                    mapId: selected.id,
+                                    revision: _leaderboardRevision,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                              ],
                             ),
-                          ),
-                          const SizedBox(height: tileGap),
-                        ],
+                            if (showPlayMask)
+                              const _HomeMask(key: Key('tutorial-home-mask')),
+                          ],
+                        ),
                       ),
-                    );
-                  },
-                ),
+                      DecoratedBox(
+                        decoration: showPlayMask
+                            ? BoxDecoration(
+                                borderRadius: BorderRadius.circular(28),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Palette.menuAccent.withValues(
+                                      alpha: 0.55,
+                                    ),
+                                    blurRadius: 16,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              )
+                            : const BoxDecoration(),
+                        child: GameDialogButton(
+                          label: AppString.playLevel,
+                          enabled: !selectedLocked,
+                          onTap: () {
+                            if (_dailySelected) {
+                              _openDaily(daily);
+                              return;
+                            }
+                            _openCampaign(levels, _selectedIndex);
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-              const SizedBox(width: 28),
-              Expanded(
-                flex: 1,
-                child: Padding(
-                  padding: const EdgeInsets.only(
-                    top: listTop,
-                    bottom: listBottom,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        for (var index = 0; index < levels.length; index++) ...[
-                          if (index > 0) const SizedBox(height: tileGap),
-                          SizedBox(
-                            height: tileHeight,
-                            child: _LevelTile(
-                              index: index,
-                              level: levels[index],
-                              best: _bests.forLevel(levels[index].id),
-                              locked: _tutorialLocksMaps && index > 0,
-                              onTap: () => _openCampaign(levels, index),
-                            ),
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            flex: 6,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Column(
+                  children: [
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: levels.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 5,
+                            mainAxisSpacing: 6,
+                            crossAxisSpacing: 6,
+                            childAspectRatio: 1,
                           ),
-                        ],
-                      ],
+                      itemBuilder: (context, index) {
+                        return _MapSquareTile(
+                          key: ValueKey('campaign-tile-$index'),
+                          level: levels[index],
+                          best: _bests.forLevel(levels[index].id),
+                          selected: !_dailySelected && index == _selectedIndex,
+                          locked: _tutorialLocksMaps && index > 0,
+                          onTap: () => _selectCampaign(index),
+                        );
+                      },
                     ),
-                  ),
+                    const Spacer(),
+                    SizedBox(
+                      height: 72,
+                      child: _LevelTile(
+                        level: daily,
+                        backgroundLabel: AppString.dailyMap,
+                        title: daily.name,
+                        best: _bests.forLevel(daily.id),
+                        selected: _dailySelected,
+                        locked: _tutorialLocksMaps,
+                        onTap: _selectDaily,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          );
-        },
+                if (showPlayMask) const _HomeMask(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
+  }
+}
+
+class _HomeMask extends StatelessWidget {
+  const _HomeMask({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const AbsorbPointer(child: ColoredBox(color: Color(0xB3000000)));
   }
 }
 
@@ -355,34 +545,129 @@ class _PenguinPainter extends CustomPainter {
   }
 }
 
+class _MapSquareTile extends StatelessWidget {
+  const _MapSquareTile({
+    super.key,
+    required this.level,
+    required this.best,
+    required this.selected,
+    required this.locked,
+    required this.onTap,
+  });
+
+  final LevelMap level;
+  final double? best;
+  final bool selected;
+  final bool locked;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final award = bestAwardFor(
+      best: best,
+      bronzeTime: level.bronzeTime,
+      silverTime: level.silverTime,
+      goldTime: level.goldTime,
+      authorTime: level.authorTime,
+    );
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: const Color(0xFF161821),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? Palette.menuAccent : const Color(0x18FFFFFF),
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (locked)
+                  const Positioned.fill(
+                    child: ColoredBox(color: Color(0xAA0A0B10)),
+                  ),
+                LayoutBuilder(
+                  builder: (context, tileBox) {
+                    final medalSize = (tileBox.maxWidth * 0.38).clamp(
+                      16.0,
+                      26.0,
+                    );
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 6, 4, 4),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: Center(
+                              child: _AwardSlot(
+                                size: medalSize,
+                                filled: award != BestAward.none,
+                                asset: _awardAsset(award),
+                                frameCount: award == BestAward.author ? 5 : 8,
+                              ),
+                            ),
+                          ),
+                          _TimeChip(best: best, compact: true),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                if (locked)
+                  const Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Icon(
+                      Icons.lock_outline,
+                      size: 12,
+                      color: Palette.hudMuted,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _awardAsset(BestAward award) {
+  return switch (award) {
+    BestAward.bronze => GameSprites.bundle(GameSprites.medalCopper),
+    BestAward.silver => GameSprites.bundle(GameSprites.medalSilver),
+    BestAward.gold => GameSprites.bundle(GameSprites.medalGold),
+    BestAward.author => GameSprites.bundle(GameSprites.authorGem),
+    BestAward.none => GameSprites.bundle(GameSprites.medalCopper),
+  };
+}
+
 class _LevelTile extends StatelessWidget {
   const _LevelTile({
     required this.level,
     required this.best,
     required this.onTap,
-    this.index,
     this.backgroundLabel,
     this.title,
+    this.selected = false,
     this.locked = false,
   });
 
-  final int? index;
   final String? backgroundLabel;
   final LevelMap level;
   final String? title;
   final double? best;
+  final bool selected;
   final bool locked;
   final VoidCallback onTap;
 
-  String? get _background {
-    if (backgroundLabel != null) {
-      return backgroundLabel;
-    }
-    if (index == null) {
-      return null;
-    }
-    return (index! + 1).toString().padLeft(2, '0');
-  }
+  String? get _background => backgroundLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -391,13 +676,16 @@ class _LevelTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: locked ? null : onTap,
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Ink(
           decoration: BoxDecoration(
             color: const Color(0xFF161821),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0x18FFFFFF)),
+            border: Border.all(
+              color: selected ? Palette.menuAccent : const Color(0x18FFFFFF),
+              width: selected ? 2 : 1,
+            ),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
@@ -569,25 +857,31 @@ class _EmptyAward extends StatelessWidget {
 }
 
 class _TimeChip extends StatelessWidget {
-  const _TimeChip({required this.best});
+  const _TimeChip({required this.best, this.compact = false});
 
   final double? best;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final hasTime = best != null;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 6 : 10,
+        vertical: compact ? 2 : 4,
+      ),
       decoration: BoxDecoration(
         color: hasTime ? const Color(0xFF222433) : const Color(0xFF1B1D28),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         hasTime ? formatRunTime(best!) : AppString.noTime,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: hasTime ? Palette.hud : Palette.hudMuted,
           fontWeight: FontWeight.w800,
-          fontSize: 13,
+          fontSize: compact ? 10 : 13,
           height: 1.1,
           fontFeatures: const [FontFeature.tabularFigures()],
         ),

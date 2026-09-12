@@ -28,6 +28,39 @@ void main() {
     );
   });
 
+  test('bestAwardFor keeps only the highest unlocked award', () {
+    expect(
+      bestAwardFor(
+        best: 10,
+        bronzeTime: 20,
+        silverTime: 15,
+        goldTime: 12,
+        authorTime: 9,
+      ),
+      BestAward.gold,
+    );
+    expect(
+      bestAwardFor(
+        best: 9,
+        bronzeTime: 20,
+        silverTime: 15,
+        goldTime: 12,
+        authorTime: 9,
+      ),
+      BestAward.author,
+    );
+    expect(
+      bestAwardFor(
+        best: 21,
+        bronzeTime: 20,
+        silverTime: 15,
+        goldTime: 12,
+        authorTime: 9,
+      ),
+      BestAward.none,
+    );
+  });
+
   test('missing target or a slower run stays empty', () {
     expect(
       medalReveal(runTime: 11, previousBest: null, target: null),

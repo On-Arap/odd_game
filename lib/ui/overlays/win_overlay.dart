@@ -302,10 +302,7 @@ class _EmptyMedal extends StatelessWidget {
 }
 
 class _AuthorGem extends StatelessWidget {
-  const _AuthorGem({
-    required this.justEarned,
-    required this.animation,
-  });
+  const _AuthorGem({required this.justEarned, required this.animation});
 
   final bool justEarned;
   final Animation<double> animation;
@@ -349,12 +346,7 @@ class _AuthorGem extends StatelessWidget {
     if (!justEarned) {
       return gem;
     }
-    return _PopIn(
-      animation: animation,
-      start: 0.55,
-      end: 1,
-      child: gem,
-    );
+    return _PopIn(animation: animation, start: 0.55, end: 1, child: gem);
   }
 }
 

@@ -85,13 +85,13 @@ class HudState extends ChangeNotifier {
   }
 }
 
-/// Affiche `s.xx` ou `m:ss.xx`.
+/// Affiche `s.xxx` ou `m:ss.xxx`.
 String formatRunTime(double seconds) {
-  final whole = seconds.floor();
+  final ms = (seconds * 1000).round();
+  final whole = ms ~/ 1000;
   final minutes = whole ~/ 60;
   final secs = whole % 60;
-  final hundredths = ((seconds - whole) * 100).floor().clamp(0, 99);
-  final frac = hundredths.toString().padLeft(2, '0');
+  final frac = (ms % 1000).toString().padLeft(3, '0');
   if (minutes > 0) {
     return '$minutes:${secs.toString().padLeft(2, '0')}.$frac';
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
@@ -147,6 +148,10 @@ abstract final class MapPreviewRenderer {
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+      Paint()..color = Palette.background,
+    );
     for (var row = 0; row < rows; row++) {
       for (var col = 0; col < cols; col++) {
         _paintCell(canvas, grid, assets, col, row);
@@ -155,6 +160,44 @@ abstract final class MapPreviewRenderer {
 
     final picture = recorder.endRecording();
     return picture.toImage(width, height);
+  }
+
+  /// PNG base64 de la preview, ramené à [maxSide] px.
+  static Future<String?> pngBase64({
+    required List<String> grid,
+    required MapMakerAssets assets,
+    int maxSide = 384,
+  }) async {
+    final source = await rasterize(grid: grid, assets: assets);
+    try {
+      final longest = source.width > source.height
+          ? source.width
+          : source.height;
+      final scale = longest <= maxSide ? 1.0 : maxSide / longest;
+      final width = (source.width * scale).round().clamp(1, maxSide);
+      final height = (source.height * scale).round().clamp(1, maxSide);
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.drawImageRect(
+        source,
+        Rect.fromLTWH(0, 0, source.width.toDouble(), source.height.toDouble()),
+        Rect.fromLTWH(0, 0, width.toDouble(), height.toDouble()),
+        Paint()..filterQuality = FilterQuality.none,
+      );
+      final picture = recorder.endRecording();
+      final scaled = await picture.toImage(width, height);
+      try {
+        final bytes = await scaled.toByteData(format: ui.ImageByteFormat.png);
+        if (bytes == null) {
+          return null;
+        }
+        return base64Encode(bytes.buffer.asUint8List());
+      } finally {
+        scaled.dispose();
+      }
+    } finally {
+      source.dispose();
+    }
   }
 
   /// Sol, pièce, spawn ou vide.

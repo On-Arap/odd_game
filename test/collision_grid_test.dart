@@ -5,8 +5,7 @@ import 'package:odd/domain/level_map.dart';
 import 'package:odd/game/collision/collision_grid.dart';
 
 LevelMap _box() {
-  return LevelMap.parseJson(
-    '''
+  return LevelMap.parseJson('''
 {
   "format": 1,
   "id": "box",
@@ -19,9 +18,7 @@ LevelMap _box() {
     "####"
   ]
 }
-''',
-    file: 'box.json',
-  );
+''', file: 'box.json');
 }
 
 void main() {
